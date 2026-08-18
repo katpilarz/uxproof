@@ -27,7 +27,20 @@ async function fetchSessionMessages(sessionId: string): Promise<Message[]> {
       role:      m.role as 'user' | 'assistant',
       content:   m.content || '',
       timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
-    }));
+      // Presentation metadata — restores the preview card in history.
+      // No downloadUrl is stored, so the card renders in idle state with
+      // the manual "Generate & download" button (autoStart stays off for
+      // old timestamps).
+      ...(m.showPresentation ? {
+        showPresentation:  true,
+        presentationScope: m.presentationScope,
+        year:              m.year,
+        quarter:           m.quarter,
+        contextRef:        m.contextQuarter
+          ? { project: 'UX Research Report', quarter: m.contextQuarter }
+          : undefined,
+      } : {}),
+    } as Message));
   } catch (e) {
     console.warn('[session-slice] fetchSessionMessages error:', e);
     return [];

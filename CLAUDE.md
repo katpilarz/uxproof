@@ -2,8 +2,8 @@
 
 ## Project context
 
-uxproof is an internal tool by PAISAK4U (Katarzyna Pilarz) that turns quarterly UX
-research data into client-ready, PAISAK4U-branded 8-slide PowerPoint decks. The user
+uxproof is an internal tool by Katarzyna Pilarz that turns quarterly UX
+research data into client-ready, monochrome 8-slide PowerPoint decks. The user
 asks in plain language ("Analyse Q3 2025", "Compare Q2 vs Q3"); the system queries the
 research database, runs a multi-agent analysis, and renders a fixed .pptx deck.
 The bundled dataset (client "Aurelo") is 100% fictional demo data.
@@ -36,9 +36,11 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   is a fixed 8-slide template (Cover → SUS headline → trend chart → 8 indicators →
   top issues → recommendations → summary → thank-you). Don't make slide structure or
   styling model-driven.
-- **Single brand source of truth:** `next/src/lib/branding/brand.ts` (paisak4u.com
-  style — black/white, Schibsted Grotesk + IBM Plex Mono, hairline rules; violet /
-  graphite / pink reserved for data). Never hardcode brand values elsewhere.
+- **Single template source of truth:** `next/src/lib/branding/brand.ts` — strictly
+  monochrome (black / white / gray only, NO accent colours, NO logos or company
+  branding anywhere in app or decks; Space Grotesk + DM Sans + DM Mono, hairline
+  rules). Never hardcode template values elsewhere; never reintroduce logos, red,
+  or accent colours.
 - **Local-only inference is a product feature.** Client research data never leaves the
   machine. Do not introduce cloud LLM calls or send research data to external services.
 - **No orchestration frameworks.** The pipeline is deliberately hand-rolled (AutoGen

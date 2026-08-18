@@ -3,18 +3,18 @@
  *
  * Renders the fixed 8-slide uxproof deck from a Sanity slidePlan:
  *
- *   1. Cover            — period + report title, default cover photo right
- *   2. Headline Score   — hero SUS value on graphite, 4 violet KPI cards
+ *   1. Cover            — period + report title, grayscale cover photo right
+ *   2. Headline Score   — hero SUS value on black, 4 KPI cards
  *   3. Usability Trend  — SUS / task-success line chart, black side panel
  *   4. UX Indicators    — 8 KPI cards on white
  *   5. Usability Issues — three numbered columns
  *   6. Recommendations  — three numbered columns under a black banner
  *   7. Summary          — editorial narrative on black
- *   8. Thank You        — wordmark + tagline
+ *   8. Thank You        — centred display type, no logo
  *
- * Styling follows the PAISAK4U brand system (lib/branding/brand.ts):
- * black/white foundation, Schibsted Grotesk + IBM Plex Mono, and
- * violet / graphite / pink accents used sparingly.
+ * Styling is the original executive-report template geometry in strict
+ * monochrome (lib/branding/brand.ts): black / white / gray only, no
+ * logos, Space Grotesk + DM Sans + DM Mono throughout.
  *
  * Layout notes preserved from earlier tuning:
  *   - Column titles on slides 5 + 6 render at a SINGLE fixed size (18pt);
@@ -69,40 +69,33 @@ export interface PptResult {
   generatedDate:  Date;
 }
 
-// ─── Palette & type (from the PAISAK4U brand system) ─────────────────────────
+// ─── Palette & type (monochrome template system) ─────────────────────────────
 const C = {
-  black:      BRAND.colors.black,
-  white:      BRAND.colors.white,
-  violet:     BRAND.colors.violet,
-  violetDeep: BRAND.colors.violetDeep,
-  graphite:   BRAND.colors.graphite,
-  pink:       BRAND.colors.pink,
-  pinkDeep:   BRAND.colors.pinkDeep,
-  gray:       BRAND.colors.gray,
-  rule:       BRAND.colors.rule,
+  black:    BRAND.colors.black,
+  white:    BRAND.colors.white,
+  grayDark: BRAND.colors.grayDark,
+  gray:     BRAND.colors.gray,
+  divider:  BRAND.colors.divider,
 };
 
 const F = {
-  heading:      BRAND.fonts.display,       // Schibsted Grotesk Medium
-  headingLight: BRAND.fonts.displayLight,  // Schibsted Grotesk
-  body:         BRAND.fonts.body,          // Schibsted Grotesk
-  mono:         BRAND.fonts.mono,          // IBM Plex Mono
+  heading:      BRAND.fonts.display,       // Space Grotesk Medium
+  headingLight: BRAND.fonts.displayLight,  // Space Grotesk
+  body:         BRAND.fonts.body,          // DM Sans Medium
+  bodyDesc:     BRAND.fonts.bodyDesc,      // DM Sans 18pt Medium
+  mono:         BRAND.fonts.mono,          // DM Mono
 };
 
 // Kerning. `hero` is the only size large enough that tight tracking reads
 // as a design choice rather than crowding — reserved for the 88pt cover
-// title and the 64pt "Thank You". The site's display style uses the same
-// negative-tracking-at-scale principle.
+// title and the 64pt "Thank You".
 const K = { hero: -2, heading: 0, body: 0 };
 
-// Chrome geometry. The PAISAK4U wordmark is 1716:268 (~6.4:1) — keep
-// logoW/logoH in that ratio wherever it is placed.
+// Chrome geometry — slide number top-right, report label bottom-left.
 const CH = {
-  logoX: 0.130, logoY: 0.150, logoW: 0.900, logoH: 0.141,
   numX:  9.550, numY:  0.100, numW:  0.349, numH:  0.199,
-  footerY:   5.427,
-  footerLX:  0.162, footerLW: 2.499,
-  footerRX:  8.600, footerRW: 1.199,
+  footerY:  5.427,
+  footerLX: 0.162, footerLW: 2.499,
 };
 
 /**
@@ -117,27 +110,17 @@ const COLUMN_TITLE_MAX_CHARS = 44;   // matches planning_agent.py hard cap
 
 // ─── Chrome ───────────────────────────────────────────────────────────────────
 
-function logoFor(dark: boolean): string {
-  return dark ? ASSETS.LOGO_LIGHT : ASSETS.LOGO_DARK;
-}
-
 function addChrome(s: any, num: number, dark: boolean, label: string) {
-  const numColor  = dark ? C.white : C.black;
+  const numColor  = dark ? C.white : C.grayDark;
   const footColor = dark ? C.white : C.gray;
-
-  s.addImage({ data: logoFor(dark), x: CH.logoX, y: CH.logoY, w: CH.logoW, h: CH.logoH });
 
   s.addText(String(num).padStart(2, '0'), {
     x: CH.numX, y: CH.numY, w: CH.numW, h: CH.numH,
     fontFace: F.mono, fontSize: 7.5, color: numColor, align: 'right', margin: 0,
   });
-  s.addText(label.toUpperCase(), {
+  s.addText(label, {
     x: CH.footerLX, y: CH.footerY, w: CH.footerLW, h: 0.114,
-    fontFace: F.mono, fontSize: 7.5, color: footColor, charSpacing: 1, margin: 0,
-  });
-  s.addText(BRAND.domain, {
-    x: CH.footerRX, y: CH.footerY, w: CH.footerRW, h: 0.114,
-    fontFace: F.mono, fontSize: 7.5, color: footColor, charSpacing: 1, align: 'right', margin: 0,
+    fontFace: F.mono, fontSize: 7.5, color: footColor, margin: 0,
   });
 }
 
@@ -262,8 +245,8 @@ export async function generatePowerPoint(
 
   const pptx   = new PptxGenJS();
   pptx.layout  = 'LAYOUT_16x9';
-  pptx.author  = `${BRAND.owner} — ${BRAND.company}`;
-  pptx.company = BRAND.company;
+  pptx.author  = BRAND.app;
+  pptx.company = BRAND.app;
   pptx.title   = reportLabel || 'UX Executive Report';
 
   const label = reportLabel || 'UX Executive Report';
@@ -323,12 +306,6 @@ function addCoverSlide(pptx: any, slide: SlideConfig, label: string) {
 
   const { period, sub } = splitCoverTitle(slide.title);
 
-  s.addText('UX RESEARCH REPORT', {
-    x: 0.090, y: 2.700, w: 5.400, h: 0.240,
-    fontFace: F.mono, fontSize: 10, color: C.gray, charSpacing: 2,
-    margin: 0,
-  });
-
   s.addText(period, {
     x: 0.079, y: 3.150, w: 5.500, h: 1.450,
     fontFace: F.heading, fontSize: 88, color: C.black, charSpacing: K.hero,
@@ -347,12 +324,12 @@ function addCoverSlide(pptx: any, slide: SlideConfig, label: string) {
 }
 
 // ─── Slide 2: Headline Score ─────────────────────────────────────────────────
-// Graphite background; hero SUS value; 4 violet KPI cards with the change
-// indicator in pink. Cards align to the title's left edge.
+// Black background; hero SUS value; 4 dark-gray KPI cards. Cards align to
+// the title's left edge.
 
 function addHeadlineScoreSlide(pptx: any, slide: SlideConfig, label: string) {
   const s = pptx.addSlide();
-  s.background = { color: C.graphite };
+  s.background = { color: C.black };
 
   const subtitleBlock = firstByType(slide.content, 'subtitleBlock');
   const kpiItems      = byType(slide.content, 'kpiItem');
@@ -363,9 +340,9 @@ function addHeadlineScoreSlide(pptx: any, slide: SlideConfig, label: string) {
     margin: 0, bold: false,
   });
 
-  s.addText((subtitleBlock?.text || `${label} usability summary`).toUpperCase(), {
+  s.addText(subtitleBlock?.text || `${label} usability summary`, {
     x: 0.409, y: 2.521, w: 8.500, h: 0.275,
-    fontFace: F.mono, fontSize: 11, color: C.pink, charSpacing: 1.5, margin: 0,
+    fontFace: F.body, fontSize: 14, italic: true, color: C.white, margin: 0,
   });
 
   // Card layout: card edge aligned with title edge.
@@ -377,7 +354,7 @@ function addHeadlineScoreSlide(pptx: any, slide: SlideConfig, label: string) {
     const bx = boxXs[i];
     s.addShape(pptx.shapes.RECTANGLE, {
       x: bx, y: 3.380, w: 1.910, h: 1.150,
-      fill: { color: C.violet }, line: { color: C.violet },
+      fill: { color: C.grayDark }, line: { color: C.grayDark },
     });
     s.addText(kpi.value || '—', {
       x: bx + 0.140, y: 3.470, w: 1.793, h: 0.420,
@@ -391,7 +368,7 @@ function addHeadlineScoreSlide(pptx: any, slide: SlideConfig, label: string) {
     if (kpi.change !== undefined && kpi.change !== null) {
       s.addText(formatPct(kpi.change), {
         x: bx + 0.140, y: 4.200, w: pctW, h: 0.260,
-        fontFace: F.mono, fontSize: 10, bold: false, color: C.pink,
+        fontFace: F.body, fontSize: 10, bold: true, color: C.white,
         align: 'right', margin: 0,
       });
     }
@@ -401,8 +378,8 @@ function addHeadlineScoreSlide(pptx: any, slide: SlideConfig, label: string) {
 }
 
 // ─── Slide 3: Usability Trend ────────────────────────────────────────────────
-// Black side panel with the title; line chart in violet + pink. Thick line
-// + visible data symbols so single-point series still render.
+// Black side panel with the title; monochrome line chart. Thick line +
+// visible data symbols so single-point series still render.
 
 function addTrendSlide(pptx: any, slide: SlideConfig, label: string) {
   const s = pptx.addSlide();
@@ -428,7 +405,7 @@ function addTrendSlide(pptx: any, slide: SlideConfig, label: string) {
   if (valid.length > 0) {
     s.addChart(pptx.charts.LINE, valid, {
       x: 4.500, y: 0.350, w: 5.349, h: 4.999,
-      chartColors: [C.violet, C.pinkDeep],
+      chartColors: [...BRAND.charts.seriesColors],
       lineSize: 3.0, lineSmooth: false,
       lineDataSymbol: 'circle',
       lineDataSymbolSize: 8,
@@ -437,7 +414,7 @@ function addTrendSlide(pptx: any, slide: SlideConfig, label: string) {
       catAxisLabelFontSize: 9, valAxisLabelFontSize: 9,
       catAxisLabelFontFace: F.body, valAxisLabelFontFace: F.body,
       catAxisLabelColor: C.gray, valAxisLabelColor: C.gray,
-      valGridLine: { color: C.rule, style: 'solid', size: 0.5 },
+      valGridLine: { color: C.divider, style: 'solid', size: 0.5 },
       catGridLine: { style: 'none' },
       chartArea: { fill: { color: C.white } },
       showValue: true,
@@ -447,7 +424,7 @@ function addTrendSlide(pptx: any, slide: SlideConfig, label: string) {
   } else {
     s.addShape(pptx.shapes.RECTANGLE, {
       x: 4.5, y: 0.35, w: 5.35, h: 5.0,
-      fill: { color: 'F8F8F8' }, line: { color: C.rule },
+      fill: { color: 'F8F8F8' }, line: { color: C.divider },
     });
     s.addText('SUS & Task Success Trend', {
       x: 5.0, y: 2.5, w: 4.35, h: 0.5,
@@ -459,7 +436,7 @@ function addTrendSlide(pptx: any, slide: SlideConfig, label: string) {
 }
 
 // ─── Slide 4: UX Indicators ──────────────────────────────────────────────────
-// White ground, 8 black KPI cards with change indicators in pink.
+// White ground, 8 black KPI cards.
 
 function addKpiDashboardSlide(pptx: any, slide: SlideConfig, label: string) {
   const s = pptx.addSlide();
@@ -507,7 +484,7 @@ function addKpiDashboardSlide(pptx: any, slide: SlideConfig, label: string) {
     if (kpi.change !== undefined && kpi.change !== null) {
       s.addText(formatPct(kpi.change), {
         x: bx + 0.140, y: by + 0.900, w: 1.770, h: 0.260,
-        fontFace: F.mono, fontSize: 9, bold: false, color: C.pink,
+        fontFace: F.body, fontSize: 9, bold: true, color: C.white,
         align: 'right', margin: 0,
       });
     }
@@ -517,7 +494,7 @@ function addKpiDashboardSlide(pptx: any, slide: SlideConfig, label: string) {
 }
 
 // ─── Slide 5: Usability Issues ───────────────────────────────────────────────
-// Three numbered columns between hairline rules; numbering in violet mono.
+// Three numbered columns between hairline rules; numbering in black mono.
 // Geometry matches slide 6 EXACTLY — the only difference vs slide 6 is
 // the absence of the black banner.
 
@@ -545,7 +522,7 @@ function addIssuesSlide(pptx: any, slide: SlideConfig, label: string) {
     const cx = colX[i];
     s.addText(`0${i + 1}`, {
       x: cx, y: 2.060, w: 0.900, h: 0.550,
-      fontFace: F.mono, fontSize: 28, color: C.violet, charSpacing: 0,
+      fontFace: F.mono, fontSize: 28, color: C.black, charSpacing: 0,
       margin: 0, bold: false,
     });
     const rawTitle = issue.title || `Issue ${i + 1}`;
@@ -556,9 +533,10 @@ function addIssuesSlide(pptx: any, slide: SlideConfig, label: string) {
       fontFace: F.heading, fontSize: titleFontSize, color: C.black, charSpacing: K.heading,
       wrap: true, valign: 'top', margin: 0, bold: false,
     });
+    // Description: DM Sans 18pt Medium at 12pt for a lighter look.
     s.addText((issue.description || '').slice(0, 240) || 'No description.', {
       x: cx, y: 3.800, w: 2.900, h: 1.350,
-      fontFace: F.body, fontSize: 12, color: C.black, wrap: true, margin: 0, valign: 'top',
+      fontFace: F.bodyDesc, fontSize: 12, color: C.black, wrap: true, margin: 0, valign: 'top',
     });
   });
 
@@ -567,7 +545,7 @@ function addIssuesSlide(pptx: any, slide: SlideConfig, label: string) {
 
 // ─── Slide 6: Recommendations ────────────────────────────────────────────────
 // Black banner (1.902" tall), then the same three-column geometry as
-// slide 5; numbering in pink mono.
+// slide 5; numbering in black mono.
 
 function addRecommendationsSlide(pptx: any, slide: SlideConfig, label: string) {
   const s = pptx.addSlide();
@@ -602,7 +580,7 @@ function addRecommendationsSlide(pptx: any, slide: SlideConfig, label: string) {
     const cx = colX[i];
     s.addText(`0${i + 1}`, {
       x: cx, y: 2.060, w: 0.900, h: 0.550,
-      fontFace: F.mono, fontSize: 28, color: C.pinkDeep, charSpacing: 0,
+      fontFace: F.mono, fontSize: 28, color: C.black, charSpacing: 0,
       margin: 0, bold: false,
     });
     const rawTitle = item.title || `Recommendation ${i + 1}`;
@@ -614,19 +592,15 @@ function addRecommendationsSlide(pptx: any, slide: SlideConfig, label: string) {
     });
     s.addText((item.description || '').slice(0, 240), {
       x: cx, y: 3.800, w: 2.900, h: 1.350,
-      fontFace: F.body, fontSize: 12, color: C.black, wrap: true, margin: 0, valign: 'top',
+      fontFace: F.bodyDesc, fontSize: 12, color: C.black, wrap: true, margin: 0, valign: 'top',
     });
   });
 
   addChrome(s, slide.number, true, label);
-  // Footer labels sit on the white area below the banner — redraw in gray
-  s.addText(label.toUpperCase(), {
+  // Footer label sits on the white area below the banner — redraw in gray
+  s.addText(label, {
     x: CH.footerLX, y: CH.footerY, w: CH.footerLW, h: 0.114,
-    fontFace: F.mono, fontSize: 7.5, color: C.gray, charSpacing: 1, margin: 0,
-  });
-  s.addText(BRAND.domain, {
-    x: CH.footerRX, y: CH.footerY, w: CH.footerRW, h: 0.114,
-    fontFace: F.mono, fontSize: 7.5, color: C.gray, charSpacing: 1, align: 'right', margin: 0,
+    fontFace: F.mono, fontSize: 7.5, color: C.gray, margin: 0,
   });
 }
 
@@ -641,12 +615,6 @@ function addSummarySlide(pptx: any, slide: SlideConfig, label: string) {
   // 6-line budget so the planning agent's longer summaries
   // (MAX_NARRATIVE_ARC_CHARS = 330) fit comfortably.
   const clamped = clampLines(raw, 6, 50);
-
-  // Short violet rule above the narrative — the deck's only flourish here.
-  s.addShape(pptx.shapes.RECTANGLE, {
-    x: 0.750, y: 0.820, w: 0.600, h: 0.030,
-    fill: { color: C.violet }, line: { color: C.violet },
-  });
 
   s.addText(clamped, {
     x: 0.750, y: 1.100, w: 8.500, h: 4.000,
@@ -664,28 +632,17 @@ function addThankYouSlide(pptx: any, slide: SlideConfig, label: string) {
   const s = pptx.addSlide();
   s.background = { color: C.white };
 
-  // Wordmark centred above the title (aspect 6.4:1).
-  const logoW = 3.000;
-  const logoH = 0.469;
-  s.addImage({
-    data: ASSETS.LOGO_BIG,
-    x: (10 - logoW) / 2,
-    y: 1.500,
-    w: logoW, h: logoH,
-    sizing: { type: 'contain', w: logoW, h: logoH },
-  });
-
   s.addText('Thank You', {
-    x: 0.260, y: 2.700, w: 9.479, h: 1.000,
+    x: 0.260, y: 2.300, w: 9.479, h: 1.000,
     fontFace: F.heading, fontSize: 64, color: C.black, charSpacing: K.hero,
     align: 'center', margin: 0, bold: false,
   });
 
   const subtitleBlock = firstByType(slide.content, 'subtitleBlock');
   const tagline = subtitleBlock?.text || label;
-  s.addText(tagline.toUpperCase(), {
-    x: 0.260, y: 3.700, w: 9.479, h: 0.400,
-    fontFace: F.mono, fontSize: 12, color: C.gray, charSpacing: 1.5,
+  s.addText(tagline, {
+    x: 0.260, y: 3.300, w: 9.479, h: 0.400,
+    fontFace: F.mono, fontSize: 12, color: C.grayDark,
     align: 'center', margin: 0,
   });
 }

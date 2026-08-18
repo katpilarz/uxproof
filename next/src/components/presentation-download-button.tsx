@@ -188,7 +188,7 @@ export function PresentationDownloadButton({
             Presentation ready
           </span>
           {count > 0 && (
-            <span className="text-[11px] text-zinc-500">{count} slides · PAISAK4U branding</span>
+            <span className="text-[11px] text-zinc-500">{count} slides · research template</span>
           )}
         </div>
 

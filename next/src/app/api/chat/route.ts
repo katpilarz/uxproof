@@ -41,6 +41,100 @@ import { createChatSession, appendMessageToSession } from '@/lib/sanity';
 
 const AGENT_SERVICE = process.env.AGENT_SERVICE_URL || 'http://localhost:8001';
 
+// Local LLM for conversational answers (same Ollama instance the agent
+// service uses). All numbers still come from Sanity via unified-agent —
+// the model only rephrases retrieved facts to address the actual question.
+const OLLAMA_URL   = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL    || 'qwen2.5:14b';
+
+type HistoryTurn = { role: 'user' | 'assistant'; content: string };
+
+/**
+ * Rewrite a data-grounded template answer into a conversational reply that
+ * actually addresses the user's question.
+ *
+ * Grounding contract (see CLAUDE.md "the LLM never invents data"):
+ *   - The FACTS block is the unified-agent's deterministic output — every
+ *     number in it came from Sanity.
+ *   - The model is instructed to use only those facts.
+ *   - A post-check verifies every number in the reply exists in the facts;
+ *     any violation discards the rewrite.
+ *
+ * Returns null on ANY failure (Ollama down, timeout, guardrail) — the
+ * caller then keeps the deterministic template, so this layer is a pure
+ * enhancement with no availability cost.
+ */
+async function conversationalize(
+  question: string,
+  facts: string,
+  history: HistoryTurn[],
+): Promise<string | null> {
+  try {
+    const historyBlock = history.length
+      ? history
+          .map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content.slice(0, 400)}`)
+          .join('\n')
+      : '(none)';
+
+    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model:    OLLAMA_MODEL,
+        stream:   false,
+        options:  { temperature: 0.3, num_predict: 400 },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are the uxproof research assistant, a UX research analyst. ' +
+              'Answer the user\'s question directly and conversationally, in GitHub-flavoured markdown. ' +
+              'Use ONLY the facts provided — never invent numbers, periods, findings or trends. ' +
+              'Quote numbers exactly as written in the facts. ' +
+              'Lead with the answer to the specific question; add at most 2-3 supporting facts that are genuinely relevant. ' +
+              'Do NOT dump every metric — select what answers the question. ' +
+              'If the facts do not contain what was asked, say so plainly and mention what data IS available. ' +
+              'Keep it under 120 words. No greetings, no sign-offs.',
+          },
+          {
+            role: 'user',
+            content:
+              `FACTS (retrieved from the research database — the only source you may use):\n${facts}\n\n` +
+              `CONVERSATION SO FAR:\n${historyBlock}\n\n` +
+              `QUESTION: ${question}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!res.ok) return null;
+    const data  = await res.json();
+    const reply = (data?.message?.content ?? '').trim();
+    if (reply.length < 20) return null;
+
+    // Guardrail: every substantial number in the reply must appear in the
+    // facts OR the conversation history (earlier grounded answers are a
+    // legitimate source for follow-ups). Small integers (list markers,
+    // "8-slide"), years, and the SUS scale maximum (…"/ 100") are allowed.
+    const allowedDigits = (facts + '\n' + history.map(h => h.content).join('\n')).replace(/,/g, '');
+    for (const num of reply.replace(/,/g, '').match(/\d+(?:\.\d+)?/g) ?? []) {
+      const value = parseFloat(num);
+      if (value <= 12 && Number.isInteger(value)) continue;      // small counts
+      if (value === 100) continue;                               // "79.4 / 100" scale mention
+      if (value >= 2020 && value <= 2030 && Number.isInteger(value)) continue; // years
+      if (!allowedDigits.includes(num)) {
+        console.warn('[chat/route] LLM guardrail: number not in facts:', num);
+        return null;
+      }
+    }
+    return reply;
+  } catch (e) {
+    console.warn('[chat/route] conversationalize unavailable:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 // ─── Intent classification ────────────────────────────────────────────────────
 
 function classifyMessage(message: string): 'casual' | 'presentation' | 'deep' | 'data' {
@@ -73,15 +167,32 @@ function classifyMessage(message: string): 'casual' | 'presentation' | 'deep' | 
 function casualReply(message: string): string {
   const q = message.toLowerCase().trim();
   if (/^(hi|hello|hey)\b/.test(q) || /^good (morning|afternoon|evening)/.test(q)) {
-    return `Hello! I'm the **uxproof research assistant** by PAISAK4U.\n\nI can help you with:\n\n• **Analyse a quarter** — _"Analyse Q3 2025"_ or _"What is the SUS score for Q4 2025?"_\n• **Compare periods** — _"Compare Q3 vs Q4 2025"_\n• **Full year overviews** — _"Full year 2025 overview"_\n• **Generate presentations** — _"Generate Q4 2025 presentation"_ or _"Generate 2025 presentation"_\n• **Deep AI analysis** — _"Deep analysis Q3 2025"_\n\nWhat would you like to explore?`;
+    return `Hello! I'm the **uxproof research assistant**.\n\nI can help you with:\n\n• **Analyse a quarter** — _"Analyse Q3 2025"_ or _"What is the SUS score for Q4 2025?"_\n• **Compare periods** — _"Compare Q3 vs Q4 2025"_\n• **Full year overviews** — _"Full year 2025 overview"_\n• **Generate presentations** — _"Generate Q4 2025 presentation"_ or _"Generate 2025 presentation"_\n• **Deep AI analysis** — _"Deep analysis Q3 2025"_\n\nWhat would you like to explore?`;
   }
   if (/how (can|do) you help/.test(q) || /what can you do/.test(q) || /^help\b/.test(q)) {
-    return `I'm the **uxproof research assistant** — I turn UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Query SUS, task success, NPS, error-rate and conversion data from any quarter\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate PAISAK4U-branded 8-slide .pptx research decks\n\n**Try:**\n\n• _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
+    return `I'm the **uxproof research assistant** — I turn UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Query SUS, task success, NPS, error-rate and conversion data from any quarter\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
   }
-  if (/who are you/.test(q)) return `I'm the **uxproof research assistant** by PAISAK4U. Try: _"Generate Q4 2025 presentation"_ or _"Analyse Q3 2025"_`;
+  if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Generate Q4 2025 presentation"_ or _"Analyse Q3 2025"_`;
   if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse Q3 2025"_`;
   if (/^(thanks|thank you)/.test(q)) return `You're welcome! Let me know if you need any other analysis or a presentation.`;
   return `I can help you analyse UX research data and generate presentations. Try: _"Analyse Q3 2025"_`;
+}
+
+/**
+ * Follow-up questions ("and how does that compare to last quarter?") carry
+ * no explicit period, so the deterministic agent finds nothing. If the
+ * message lacks a period reference, borrow the most recent one mentioned
+ * in the conversation and append it, so intent + data resolution work.
+ */
+function resolvePeriodFromHistory(message: string, history: HistoryTurn[]): string {
+  if (/\b(q[1-4]|20\d{2})\b/i.test(message)) return message;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m =
+      history[i].content.match(/\bQ[1-4]\s*20\d{2}\b/i) ||
+      history[i].content.match(/\b20\d{2}\b/);
+    if (m) return `${message} (${m[0]})`;
+  }
+  return message;
 }
 
 // ─── Period extractor + scope detector ────────────────────────────────────────
@@ -207,6 +318,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     message    = (body.message ?? '').trim();
     const { context, sessionId, isNewSession } = body;
+    const history: HistoryTurn[] = Array.isArray(body.history)
+      ? body.history
+          .filter((h: any) => (h?.role === 'user' || h?.role === 'assistant') && typeof h?.content === 'string')
+          .slice(-6)
+      : [];
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -220,22 +336,30 @@ export async function POST(request: NextRequest) {
       year:      new Date().getFullYear(),
     };
 
-    if (isNewSession && sessionId) {
-      createChatSession(sessionId, { quarter: aiContext.quarter }).catch(e =>
-        console.warn('[chat/route] createChatSession failed:', e)
-      );
-    }
+    // Persist sequentially and AWAIT: previously these were fire-and-forget,
+    // so createOrReplace could race in after the append and wipe the user
+    // message, and the assistant append could land before the user's —
+    // which is exactly the reversed/missing history users saw.
     if (sessionId) {
-      appendMessageToSession(sessionId, {
-        messageId: `msg_${Date.now()}_user`,
-        role:      'user',
-        content:   message,
-      }).catch(e => console.warn('[chat/route] appendMessageToSession failed:', e));
+      try {
+        if (isNewSession) {
+          await createChatSession(sessionId, { quarter: aiContext.quarter });
+        }
+        await appendMessageToSession(sessionId, {
+          messageId: `msg_${Date.now()}_user`,
+          role:      'user',
+          content:   message,
+        });
+      } catch (e) {
+        console.warn('[chat/route] session persistence failed:', e);
+      }
     }
 
-    const intent              = classifyMessage(message);
-    const { quarter, year }   = extractPeriod(message);
-    const scope               = detectScope(message);
+    // Follow-ups inherit the last-mentioned period from history.
+    const resolvedMessage     = resolvePeriodFromHistory(message, history);
+    const intent              = classifyMessage(resolvedMessage);
+    const { quarter, year }   = extractPeriod(resolvedMessage);
+    const scope               = detectScope(resolvedMessage);
 
     console.log('[chat/route] intent:', intent, '| period:', quarter, year, '| scope:', scope);
 
@@ -262,7 +386,7 @@ export async function POST(request: NextRequest) {
       // "Generate & download .pptx" button — that handler POSTs to
       // /api/presentations with the scope + year/quarter forwarded below.
       const unifiedAI    = createUnifiedAI(aiContext);
-      const response     = await unifiedAI.processQuery(message);
+      const response     = await unifiedAI.processQuery(resolvedMessage);
       responseContent    = response.content ?? '';
       processingType     = 'presentation';
       showPresentation   = true;
@@ -276,7 +400,7 @@ export async function POST(request: NextRequest) {
       // Deep analysis still uses the agent pipeline + the full-report formatter —
       // that's what the user explicitly asked for ("deep analysis…",
       // "full report…", "executive summary…").
-      const result     = await callAgentPipeline(message);
+      const result     = await callAgentPipeline(resolvedMessage);
       responseContent  = result.content;
       intelligence     = result.intelligence;
       processingType   = 'analysis';
@@ -287,7 +411,7 @@ export async function POST(request: NextRequest) {
       // "compare Q3 vs Q4", "analyse Q3 2025", "full year 2025", etc.
       // unified-agent decides metric vs analysis vs comparison vs year.
       const unifiedAI = createUnifiedAI(aiContext);
-      const response  = await unifiedAI.processQuery(message);
+      const response  = await unifiedAI.processQuery(resolvedMessage);
 
       console.log('[chat/route] unifiedAI response length:', response.content?.length ?? 0);
 
@@ -298,6 +422,22 @@ export async function POST(request: NextRequest) {
       presentationScope  = response.presentationScope;
       contextRefOverride = response.contextRef;
       if (showPresentation) processingType = 'presentation';
+
+      // Conversational layer: rephrase the deterministic template through
+      // the local LLM so the reply addresses the QUESTION instead of
+      // dumping the whole record. Falls back to the template untouched
+      // when Ollama is unavailable or the guardrail trips.
+      if (!showPresentation && responseContent.trim()) {
+        const t0 = Date.now();
+        const conversational = await conversationalize(message, responseContent, history);
+        if (conversational) {
+          responseContent = conversational;
+          agentInfo = {
+            agent:          `uxproof assistant · ${OLLAMA_MODEL}`,
+            processingTime: `${((Date.now() - t0) / 1000).toFixed(1)}s`,
+          };
+        }
+      }
     }
 
     // Hard guard — never return empty content
@@ -306,13 +446,9 @@ export async function POST(request: NextRequest) {
       responseContent = `I couldn't find data for that request. Available data spans **Q1 2024 – Q1 2026**.\n\nTry:\n• _"Analyse Q3 2025"_\n• _"Full year 2025"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
     }
 
-    if (sessionId) {
-      appendMessageToSession(sessionId, {
-        messageId: `msg_${Date.now()}_assistant`,
-        role:      'assistant',
-        content:   responseContent,
-      }).catch(e => console.warn('[chat/route] appendMessageToSession (assistant) failed:', e));
-    }
+    // contextRef computed BEFORE persistence so the stored assistant
+    // message carries the resolved period label for history restore.
+    // (Declaration moved up — see contextRef rules comment below.)
 
     // contextRef rules:
     //   - casual messages → no footer (intent='casual' sets it to undefined)
@@ -326,6 +462,25 @@ export async function POST(request: NextRequest) {
             project: aiContext.projectId,
             quarter: scope === 'year' ? `${year}` : `${quarter} ${year}`,
           };
+
+    // Persist the assistant message WITH its presentation metadata so
+    // history restore can re-render the presentation card.
+    if (sessionId) {
+      try {
+        await appendMessageToSession(sessionId, {
+          messageId:         `msg_${Date.now()}_assistant`,
+          role:              'assistant',
+          content:           responseContent,
+          showPresentation,
+          presentationScope,
+          year:              showPresentation ? year    : undefined,
+          quarter:           showPresentation ? quarter : undefined,
+          contextQuarter:    contextRef?.quarter,
+        });
+      } catch (e) {
+        console.warn('[chat/route] appendMessageToSession (assistant) failed:', e);
+      }
+    }
 
     return NextResponse.json({
       id:               Date.now().toString(),

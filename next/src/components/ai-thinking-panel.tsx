@@ -21,7 +21,7 @@ const STEP_SEQUENCES: Record<string, { id: string; label: string }[]> = {
     { id: 'context',    label: 'Retrieving data from Sanity CMS…'     },
     { id: 'extraction', label: 'Extracting research intelligence…'    },
     { id: 'planning',   label: 'Planning 8-slide narrative structure…' },
-    { id: 'generating', label: 'Applying PAISAK4U branding and layout…'     },
+    { id: 'generating', label: 'Applying template layout…'     },
   ],
   analysis: [
     { id: 'context',    label: 'Querying research database…'            },
@@ -39,10 +39,15 @@ const STEP_SEQUENCES: Record<string, { id: string; label: string }[]> = {
   ],
 };
 
+// Stable default — an inline `{}` default would be a fresh object every
+// render, which re-runs the timer effect below on each parent re-render
+// and stalls the simulated step ladder.
+const NO_STREAM_STEPS: Record<string, { status?: string; duration_ms?: number }> = {};
+
 export function AIThinkingPanel({
   queryType   = 'default',
   isStreaming  = false,
-  streamSteps  = {},
+  streamSteps  = NO_STREAM_STEPS,
   className    = '',
 }: AIThinkingPanelProps) {
   const sequence = STEP_SEQUENCES[queryType] ?? STEP_SEQUENCES.default;

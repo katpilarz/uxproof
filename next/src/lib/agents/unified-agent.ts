@@ -79,10 +79,10 @@ function isCasualOrMeta(query: string): boolean {
 function buildCasualResponse(query: string): string {
   const q = query.toLowerCase().trim();
   if (/^(hi|hello|hey)\b/.test(q) || /^good (morning|afternoon|evening)/.test(q))
-    return `Hello! I'm the **uxproof research assistant** by PAISAK4U.\n\nI can help you with:\n\n• **Analyse a quarter** — _"Analyse Q3 2025"_ or _"What is the SUS score for Q4 2025?"_\n• **Compare periods** — _"Compare Q3 vs Q4 2025"_\n• **Full year overviews** — _"Full year 2025 overview"_\n• **Generate presentations** — _"Generate Q4 2025 presentation"_ or _"Generate 2025 presentation"_\n• **Deep AI analysis** — _"Deep analysis Q3 2025"_\n\nWhat would you like to explore?`;
+    return `Hello! I'm the **uxproof research assistant**.\n\nI can help you with:\n\n• **Analyse a quarter** — _"Analyse Q3 2025"_ or _"What is the SUS score for Q4 2025?"_\n• **Compare periods** — _"Compare Q3 vs Q4 2025"_\n• **Full year overviews** — _"Full year 2025 overview"_\n• **Generate presentations** — _"Generate Q4 2025 presentation"_ or _"Generate 2025 presentation"_\n• **Deep AI analysis** — _"Deep analysis Q3 2025"_\n\nWhat would you like to explore?`;
   if (/how (can|do) you help/.test(q) || /what can you do/.test(q) || /^help\b/.test(q))
-    return `I'm the **uxproof research assistant** — I turn UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Query SUS, task success, NPS, error-rate and conversion data from any quarter\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate PAISAK4U-branded 8-slide .pptx research decks\n\n**Try:**\n\n• _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
-  if (/who are you/.test(q)) return `I'm the **uxproof research assistant** by PAISAK4U. Try: _"Generate Q4 2025 presentation"_ or _"Analyse Q3 2025"_`;
+    return `I'm the **uxproof research assistant** — I turn UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Query SUS, task success, NPS, error-rate and conversion data from any quarter\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
+  if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Generate Q4 2025 presentation"_ or _"Analyse Q3 2025"_`;
   if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse Q3 2025"_`;
   if (/^(thanks|thank you)/.test(q)) return `You're welcome! Let me know if you need any other analysis or a presentation.`;
   if (/^(can you|are you able to|do you)\b/.test(q))
@@ -407,21 +407,21 @@ function buildPresentationPreview(ctx: ReportContext, scope: PresentationScope):
     const label = displayPeriod(ctx.period);
 
     if (!agg || qCount === 0) {
-      return `**Generating ${label} presentation**\n\n8-slide PAISAK4U-branded research deck — building from full-year data.\n\nClick **Generate & download .pptx** below.`;
+      return `**Generating ${label} presentation**\n\n8-slide research deck — building from full-year data. Generation is starting below; the download button appears when it’s ready.`;
     }
 
-    return `**Generating ${label} full-year presentation**\n\nAggregating **${qCount} quarter${qCount === 1 ? '' : 's'}**: avg SUS **${agg.avgSusScore}**, avg task success **${agg.avgTaskSuccessRate}%**, **${agg.totalParticipants.toLocaleString()}** research participants.\n\n8-slide PAISAK4U-branded research deck. Click **Generate & download .pptx** below.`;
+    return `**Generating ${label} full-year presentation**\n\nAggregating **${qCount} quarter${qCount === 1 ? '' : 's'}**: avg SUS **${agg.avgSusScore}**, avg task success **${agg.avgTaskSuccessRate}%**, **${agg.totalParticipants.toLocaleString()}** research participants.\n\n8-slide research deck — generating now, the download button appears below when it’s ready.`;
   }
 
   // Quarter scope
   const r = ctx.primary;
   if (!r) {
-    return `**Generating ${displayPeriod(ctx.period)} presentation**\n\n8-slide PAISAK4U-branded research deck. Click **Generate & download .pptx** below.`;
+    return `**Generating ${displayPeriod(ctx.period)} presentation**\n\n8-slide research deck — generating now, the download button appears below when it’s ready.`;
   }
   const susNote = ctx.delta
     ? `, ${pts(ctx.delta.susScore)} vs ${ctx.comparisonPeriod}`
     : '';
-  return `**Generating ${displayPeriod(ctx.period)} presentation**\n\nSUS **${r.susScore}** (${pts(r.susChange)} QoQ${susNote}), task success **${r.taskSuccessRate}%**, NPS **${sign(r.npsScore)}${r.npsScore}**.\n\n8-slide PAISAK4U-branded research deck. Click **Generate & download .pptx** below.`;
+  return `**Generating ${displayPeriod(ctx.period)} presentation**\n\nSUS **${r.susScore}** (${pts(r.susChange)} QoQ${susNote}), task success **${r.taskSuccessRate}%**, NPS **${sign(r.npsScore)}${r.npsScore}**.\n\n8-slide research deck — generating now, the download button appears below when it’s ready.`;
 }
 
 function buildResponse(
