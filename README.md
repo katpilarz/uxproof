@@ -34,18 +34,19 @@ accents reserved for data. The single source of truth is
 
 ## Setup
 
-1. **Create a Sanity project** for uxproof at
-   [sanity.io/manage](https://www.sanity.io/manage) (or `npx sanity init`).
-   Note the project ID and create an Editor API token.
+1. **Sanity project**: `uxproof` (`ygdze74e`), dataset `production` —
+   already created and preconfigured throughout. Create an **Editor API
+   token** at [manage](https://www.sanity.io/manage/project/ygdze74e)
+   → API → Tokens.
 2. **Fill in env files** (all have `.env.example` templates):
-   - `next/.env.local` — `NEXT_PUBLIC_SANITY_PROJECT_ID`, `SANITY_API_TOKEN`
-   - `sanity-studio/.env` — `SANITY_STUDIO_PROJECT_ID`
-   - `agent-service/.env` — `SANITY_PROJECT_ID`, `SANITY_API_TOKEN`
-3. **Seed the demo data**:
+   - `next/.env.local` — `SANITY_API_TOKEN`
+   - `agent-service/.env` — `SANITY_API_TOKEN`
+   - `sanity-studio/.env` — no token needed (Studio uses your login)
+3. **Demo data** is already imported. To re-seed or run the Studio:
    ```bash
    cd sanity-studio
    npm install
-   npx sanity dataset import seed-reports.ndjson production
+   npx sanity dataset import seed-reports.ndjson production --replace
    npm run dev          # Studio on http://localhost:3333
    ```
 4. **Start the agent service** (needs [Ollama](https://ollama.com) with
