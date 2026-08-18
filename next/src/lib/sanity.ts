@@ -178,7 +178,7 @@ export async function getReportsByYear(year: number) {
 //       - subtitleBlock { text }
 //       - kpiItem       { label, value, change, trend }
 //       - chartBlock    { chartData[] { name, labels[], values[] } }
-//       - riskItem      { title, description, severity }
+//       - issueItem     { title, description, severity }
 //       - priorityItem  { title, description }
 //   }
 //
