@@ -1,0 +1,9 @@
+autogen-agentchat>=0.4
+autogen-ext[ollama]>=0.4
+autogenstudio
+fastapi>=0.111
+uvicorn[standard]>=0.29
+python-dotenv>=1.0
+httpx>=0.27
+pydantic>=2.7
+sse-starlette>=2.1
