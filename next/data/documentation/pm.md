@@ -58,5 +58,5 @@ Human-readable versions of each quarter live in `data/reports/`.
   pptxgenjs deck renderer, API routes
 - **sanity-studio/** — Sanity Studio: report / intelligence / slidePlan
   / presentation / chatSession schemas + seed data
-- **autogen/** — FastAPI multi-agent pipeline: ContextAgent →
+- **agent-service/** — FastAPI multi-agent pipeline: ContextAgent →
   ExtractionAgent → PlanningAgent, backed by Ollama

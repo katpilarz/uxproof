@@ -225,7 +225,7 @@ export const createChatSlice: StateCreator<
             role:             'assistant',
             content:          result.content || 'No response received.',
             timestamp:        new Date(makeTimestamp()),
-            agentInfo:        { agent: 'AutoGen Pipeline', processingTime: result.elapsed },
+            agentInfo:        { agent: 'Agent Pipeline', processingTime: result.elapsed },
             processingType:   result.showPresentation ? 'presentation' : 'analysis',
             showPresentation: result.showPresentation,
             downloadUrl:      result.downloadUrl ?? undefined,

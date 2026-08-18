@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const AUTOGEN_URL =
-  process.env.AUTOGEN_SERVICE_URL || 'http://localhost:8001';
+const AGENT_SERVICE =
+  process.env.AGENT_SERVICE_URL || 'http://localhost:8001';
 
 export async function GET(
   _req: NextRequest,
@@ -11,7 +11,7 @@ export async function GET(
     const { pipelineId } = await context.params;
 
     const r = await fetch(
-      `${AUTOGEN_URL}/api/agents/status/${pipelineId}`
+      `${AGENT_SERVICE}/api/agents/status/${pipelineId}`
     );
 
     const data = await r.json();

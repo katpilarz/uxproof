@@ -11,7 +11,7 @@ npm run dev     # http://localhost:3000
 
 Requires `.env.local` (template: `.env.example`) pointing at your
 Sanity project, and optionally the FastAPI agent service from
-`../autogen` for deep analysis and on-demand slide-plan generation.
+`../agent-service` for deep analysis and on-demand slide-plan generation.
 
 ## Key modules
 
