@@ -18,7 +18,10 @@ export async function GET(
   try {
     const session = await client.fetch(
       `*[_type == "chatSession" && sessionId == $sessionId][0]{
-        messages[]{ messageId, role, content, timestamp }
+        messages[]{
+          messageId, role, content, timestamp,
+          showPresentation, presentationScope, year, quarter, contextQuarter
+        }
       }`,
       { sessionId }
     );

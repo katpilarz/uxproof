@@ -24,7 +24,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title:       'uxproof — UX Research Reporting by PAISAK4U',
+  title:       'uxproof — UX Research Reporting',
   description: 'Turn UX research data into client-ready presentations — validation made visible.',
 };
 

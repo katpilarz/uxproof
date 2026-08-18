@@ -1,81 +1,45 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PAISAK4U brand system for uxproof presentation templates.
+// Monochrome template system for uxproof presentation decks.
 //
-// Derived from paisak4u.com: a strict black / white foundation, generous
-// display type, uppercase mono labels, and hairline rules. The website
-// itself uses NO accent colours — decks introduce three, used sparingly:
-//
-//   • violet   — primary accent (KPI cards, chart series, numbering)
-//   • graphite — dark neutral surface between black and gray
-//   • pink     — secondary accent (change indicators, second chart series)
+// Strictly black / white / gray — no accent colours, no logos. Layout and
+// typography follow the original executive-report template: generous
+// display type, numbered mono labels, hairline rules.
 //
 // FONT NOTE:
-//   Same faces as paisak4u.com (both on Google Fonts, install locally so
-//   PowerPoint can embed/render them):
-//     • Display & body → "Schibsted Grotesk"
-//       https://fonts.google.com/specimen/Schibsted+Grotesk
-//     • Labels, numbers, footers → "IBM Plex Mono"
-//       https://fonts.google.com/specimen/IBM+Plex+Mono
+//   All faces are on Google Fonts; install locally so PowerPoint can
+//   embed/render them:
+//     • Display & headings → "Space Grotesk"
+//     • Body & descriptions → "DM Sans"
+//     • Labels, numbers, footers → "DM Mono"
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const BRAND = {
-  company:  'PAISAK4U',
-  owner:    'Katarzyna Pilarz',
-  domain:   'PAISAK4U.COM',
-  app:      'uxproof',
+  app: 'uxproof',
 
   // ── COLOR PALETTE (hex without '#', ready for pptxgenjs) ──────────────────
   colors: {
-    // Foundation — mirrors the site tokens (--bg dark / --fg)
-    black:      '0A0A0A',
-    white:      'FFFFFF',
-
-    // Accents
-    violet:     '6C4BF4',   // primary accent — cards, series, numbering
-    violetDeep: '5335C9',   // pressed / layered violet surfaces
-    graphite:   '2E2E36',   // dark neutral surface (slide 2 background)
-    pink:       'FF9ECE',   // secondary accent on dark grounds
-    pinkDeep:   'E0559A',   // secondary accent on light grounds
-
-    // Text & rules
-    gray:       '6B6B73',   // captions, metadata, de-emphasised text
-    rule:       'E5E7EB',   // hairline rules on white (site --rule light)
-    ruleDark:   '1A1A1A',   // hairline rules on black (site --rule dark)
+    black:    '0A0C0D',   // near-black foundation
+    white:    'FFFFFF',
+    grayDark: '212529',   // elevated card surfaces on black
+    gray:     '6A6E70',   // captions, metadata, axis labels
+    divider:  'E0E0E0',   // hairline rules and gridlines on white
   },
 
   // ── TYPOGRAPHY ─────────────────────────────────────────────────────────────
   fonts: {
-    display:      'Schibsted Grotesk Medium',  // hero titles, slide headings
-    displayLight: 'Schibsted Grotesk',         // large values, editorial copy
-    body:         'Schibsted Grotesk',         // paragraphs, descriptions
-    mono:         'IBM Plex Mono',             // labels, numbers, footers
-  },
-
-  // ── SLIDE TYPE COLOR KEYS ──────────────────────────────────────────────────
-  // Black/white foundation; accents appear inside content, not as washes.
-  slideThemes: {
-    cover:   { bg: 'FFFFFF', text: '0A0A0A', accent: '6C4BF4' },
-    keyData: { bg: '2E2E36', text: 'FFFFFF', accent: '6C4BF4' },
-    trend:   { bg: 'FFFFFF', text: '0A0A0A', accent: '6C4BF4' },
-    kpi:     { bg: 'FFFFFF', text: '0A0A0A', accent: 'E0559A' },
-    issues:  { bg: 'FFFFFF', text: '0A0A0A', accent: '6C4BF4' },
-    actions: { bg: 'FFFFFF', text: '0A0A0A', accent: 'E0559A' },
-    summary: { bg: '0A0A0A', text: 'FFFFFF', accent: '6C4BF4' },
-    closing: { bg: 'FFFFFF', text: '0A0A0A', accent: '6C4BF4' },
+    display:      'Space Grotesk Medium',   // hero titles, slide headings
+    displayLight: 'Space Grotesk',          // large values, editorial copy
+    body:         'DM Sans Medium',         // paragraphs, labels
+    bodyDesc:     'DM Sans 18pt Medium',    // optical-size variant for 12pt descriptions
+    mono:         'DM Mono',                // numbering, footers
   },
 
   // ── CHART DEFAULTS ─────────────────────────────────────────────────────────
   charts: {
-    seriesColors: ['6C4BF4', 'E0559A', '6B6B73'],  // violet, pink, gray
-    gridlineColor: 'E5E7EB',
-    axisColor:     '6B6B73',
-    labelFontFace: 'Schibsted Grotesk',
+    seriesColors: ['0A0C0D', '6A6E70'],   // black, gray — monochrome series
+    gridlineColor: 'E0E0E0',
+    axisColor:     '6A6E70',
+    labelFontFace: 'DM Sans',
     labelFontSize: 9,
   },
 } as const;
-
-export type SlideThemeKey = keyof typeof BRAND.slideThemes;
-
-export function getSlideTheme(key: SlideThemeKey) {
-  return BRAND.slideThemes[key] ?? BRAND.slideThemes.trend;
-}

@@ -10,8 +10,9 @@
  * No more `currentView` store flag — the URL is the source of truth.
  * TopBar reads usePathname() and uses router.push() to navigate.
  *
- * Logo click → opens the chat history sidebar (does NOT start a new chat).
- * "New Chat" / "Presentations" toggle in TopBar handles view switching.
+ * Logo click → resets to a fresh chat on the welcome screen.
+ * Sidebar icon (left of the logo) → opens the chat history sidebar.
+ * Settings lives in the chat input, not the top bar.
  */
 
 import { useRouter } from 'next/navigation';
@@ -22,7 +23,9 @@ import { ChatHistorySidebar } from '@/components/chat-history-sidebar';
 import {
   useSettingsOpen,
   useNewSession,
+  useHistoryOpen,
   useOpenHistory,
+  useCloseHistory,
   useOpenSettings,
   useCloseSettings,
 } from '@/store';
@@ -32,15 +35,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const settingsOpen = useSettingsOpen();
 
   const newSession   = useNewSession();
+  const historyOpen  = useHistoryOpen();
   const openHistory  = useOpenHistory();
+  const closeHistory = useCloseHistory();
   const openSettings = useOpenSettings();
   const closeSettings = useCloseSettings();
 
-  // Logo → open chat history sidebar.
-  // We don't reset session or navigate — just reveal the sidebar so the user
-  // can pick an existing chat or hit the + button there for a new one.
+  // Sidebar icon is a toggle: open when closed, close when open.
+  const toggleHistory = () => (historyOpen ? closeHistory() : openHistory());
+
+  // Logo → always reset to the first screen (fresh chat at root).
   const handleLogoClick = () => {
-    openHistory();
+    newSession();
+    router.push('/');
   };
 
   // "Presentations" button → navigate to /presentations
@@ -48,20 +55,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push('/presentations');
   };
 
-  // "New Chat" button (shown only when on /presentations) → fresh chat at root
-  const handleNewChatClick = () => {
-    newSession();
-    router.push('/');
-  };
-
   return (
     <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
       <TopBar
-        onSettingsClick={openSettings}
         onDashboardClick={handleDashboardClick}
         onLogoClick={handleLogoClick}
-        onHistoryClick={openHistory}
-        onNewChatClick={handleNewChatClick}
+        onHistoryClick={toggleHistory}
+        historyOpen={historyOpen}
+        onNewChatClick={handleLogoClick}
       />
 
       <div className="flex-1 flex overflow-hidden pt-14 relative">

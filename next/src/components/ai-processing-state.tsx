@@ -34,7 +34,7 @@ export function AIProcessingState({
     presentation: [
       'Retrieving report data…',
       'Generating slide content…',
-      'Applying PAISAK4U branding…',
+      'Applying template layout…',
     ],
     upload: [
       'Processing uploaded data…',

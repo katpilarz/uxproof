@@ -219,7 +219,7 @@ export function WelcomeEmptyState() {
         <div className="flex justify-center mb-4">
           <WelcomeIllustration />
         </div>
-        <h1 className="mb-3 font-bold text-3xl">UX Evidence — Perfectly Presented</h1>
+        <h1 className="mb-3 display text-3xl">UX Evidence — Perfectly Presented</h1>
         <p className="text-muted-foreground mb-8 max-w-md mx-auto">
        Turn UX research data into client-ready PowerPoint presentations — validation made visible. </p>
        </div>

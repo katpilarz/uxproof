@@ -55,6 +55,14 @@
 }
 
 :root {
+  /* Real runtime font variables — the @theme inline block above only
+     inlines values into utilities and emits NO :root vars, so every
+     raw `var(--font-…)` in @layer base needs these to resolve.
+     (--font-schibsted / --font-plex-mono are set on <body> by next/font.) */
+  --font-sans: var(--font-schibsted), "Schibsted Grotesk", "Helvetica Neue", sans-serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", monospace;
+  --font-heading: var(--font-schibsted), "Schibsted Grotesk", "Helvetica Neue", sans-serif;
+
   --background: #ffffff;
   --foreground: #09090b;
   --card: #f8f7fc;
@@ -152,6 +160,16 @@
   animation: var(--animate-step-in);
 }
 
+/* Display headline role — Schibsted Grotesk with the paisak4u.com tight
+   tracking and compact leading, at semibold weight. Use for hero/page
+   headlines instead of font-bold. */
+@utility display {
+  font-family: var(--font-schibsted, "Schibsted Grotesk"), "Schibsted Grotesk", "Helvetica Neue", sans-serif;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  font-weight: 600;
+}
+
 /* ── Base layer ───────────────────────────────────────────────────────────── */
 
 @layer base {
@@ -165,11 +183,13 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-sans);
+    font-family: var(--font-schibsted, "Schibsted Grotesk"), "Schibsted Grotesk", "Helvetica Neue", sans-serif;
   }
 
-  h1 { font-size: var(--text-2xl); font-weight: 500; line-height: 1.5; }
-  h2 { font-size: var(--text-xl);  font-weight: 500; line-height: 1.5; }
+  /* Headings: Schibsted Grotesk (same face as paisak4u.com) at semibold
+     weight with the site's tight display tracking. */
+  h1 { font-size: var(--text-2xl); font-weight: 600; line-height: 1.2; }
+  h2 { font-size: var(--text-xl);  font-weight: 600; line-height: 1.25; }
   h3 { font-size: var(--text-lg);  font-weight: 500; line-height: 1.5; }
   h4 { font-size: var(--text-base); font-weight: 500; line-height: 1.5; }
   label  { font-size: var(--text-base); font-weight: 500; line-height: 1.5; }
@@ -177,11 +197,14 @@
   input  { font-size: var(--text-base); font-weight: 400; line-height: 1.5; }
 
   h1, h2 {
-    font-family: var(--font-heading);
+    font-family: var(--font-schibsted, "Schibsted Grotesk"), "Schibsted Grotesk", "Helvetica Neue", sans-serif;
   }
 
   /* Display headings track tight, mirroring the paisak4u.com display style */
   h1 {
-    letter-spacing: -0.02em !important;
+    letter-spacing: -0.04em !important;
+  }
+  h2 {
+    letter-spacing: -0.02em;
   }
 }

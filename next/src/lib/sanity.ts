@@ -103,7 +103,10 @@ export async function createChatSession(
   sessionId: string,
   context: { quarter: string },
 ) {
-  return writeClient.createOrReplace({
+  // createIfNotExists — NOT createOrReplace. The route fires this alongside
+  // the first message append; a replace racing in later would wipe the
+  // already-appended messages array.
+  return writeClient.createIfNotExists({
     _type:     'chatSession',
     _id:       `chatSession_${sessionId}`,
     sessionId,
@@ -113,9 +116,20 @@ export async function createChatSession(
   });
 }
 
+/** Presentation metadata stored on assistant messages so history restore
+ *  can re-render the presentation card. */
+export interface MessagePresentationMeta {
+  showPresentation?:  boolean;
+  presentationScope?: 'quarter' | 'year';
+  year?:              number;
+  quarter?:           string;
+  contextQuarter?:    string;   // contextRef.quarter label, e.g. "Full Year 2025"
+}
+
 export async function appendMessageToSession(
   sessionId: string,
-  message: { messageId: string; role: 'user' | 'assistant'; content: string },
+  message: { messageId: string; role: 'user' | 'assistant'; content: string } &
+           MessagePresentationMeta,
 ) {
   const docId = `chatSession_${sessionId}`;
 
@@ -137,6 +151,13 @@ export async function appendMessageToSession(
       role:      message.role,
       content:   message.content,
       timestamp: new Date().toISOString(),
+      ...(message.showPresentation ? {
+        showPresentation:  true,
+        presentationScope: message.presentationScope,
+        year:              message.year,
+        quarter:           message.quarter,
+        contextQuarter:    message.contextQuarter,
+      } : {}),
     }])
     .commit();
 }

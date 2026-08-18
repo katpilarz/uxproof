@@ -32,7 +32,7 @@
 
 import { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence }   from 'framer-motion';
-import { Send, Sparkles, FileText, TrendingUp, BarChart3, AlertCircle } from 'lucide-react';
+import { Send, Sparkles, FileText, TrendingUp, BarChart3, AlertCircle, Settings } from 'lucide-react';
 import { Button }              from '@/components/ui/button';
 import { Badge }               from '@/components/ui/badge';
 import { Textarea }            from '@/components/ui/textarea';
@@ -50,6 +50,7 @@ import {
   useSendMessage,
   useRestoring,
   useIsNewSession,
+  useOpenSettings,
   useStore,
 } from '@/store';
 
@@ -94,6 +95,7 @@ export function ChatInterface() {
   const sendMessage     = useSendMessage();
   const restoring       = useRestoring();
   const isNewSession    = useIsNewSession();
+  const openSettings    = useOpenSettings();
   const streamSteps     = useStore(s => s.streamSteps);
 
   const [input,       setInput]       = useState('');
@@ -275,6 +277,15 @@ export function ChatInterface() {
                           scope={presentationScope}
                           year={messageYear}
                           quarter={messageQuarter}
+                          // Auto-start generation only for a message that
+                          // just arrived (fresh timestamp) — restored
+                          // history must never fire background generations.
+                          autoStart={
+                            isLastAssistant &&
+                            !message.downloadUrl &&
+                            Date.now() - new Date(message.timestamp).getTime() < 60_000
+                          }
+                          messageId={message.id}
                         />
                       </div>
                     )}
@@ -364,6 +375,16 @@ export function ChatInterface() {
 
         <div className="max-w-3xl mx-auto mb-4">
           <div className="relative flex items-center gap-2 p-2 bg-muted/50 border border-border/50 rounded-xl backdrop-blur focus-within:ring-2 focus-within:ring-violet-500/20 focus-within:border-violet-500 transition-all duration-300">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={openSettings}
+              aria-label="Settings"
+              title="Settings"
+              className="shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="size-4" />
+            </Button>
             <Textarea
               value={input}
               onChange={e => setInput(e.target.value)}

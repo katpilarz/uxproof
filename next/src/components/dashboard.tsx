@@ -121,7 +121,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
       <div className="max-w-7xl mx-auto px-6 py-8">
 
         <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold">Generated Presentations</h1>
+          <h1 className="mb-2 display text-3xl">Generated Presentations</h1>
           <p className="text-muted-foreground">
             AI-generated UX research presentations from your quarterly study data
           </p>

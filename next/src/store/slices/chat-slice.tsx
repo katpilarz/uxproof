@@ -174,6 +174,14 @@ export const createChatSlice: StateCreator<
   sendMessage: async (message, sessionId, context = {}) => {
     const isNew = get().isNewSession;
 
+    // Snapshot the last few turns BEFORE pushing the new user message —
+    // sent to the chat route so the LLM layer can handle follow-ups
+    // ("and how does that compare to last quarter?").
+    const history = get().messages.slice(-6).map(m => ({
+      role:    m.role,
+      content: (m.content || '').slice(0, 500),
+    }));
+
     set(s => {
       s.loading.chat = true;
       s.error        = null;
@@ -204,6 +212,7 @@ export const createChatSlice: StateCreator<
           context:      { ...aiContext, ...context },
           sessionId,
           isNewSession: isNew,
+          history,
         }),
         signal: AbortSignal.timeout(200_000),
       });

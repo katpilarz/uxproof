@@ -1,17 +1,28 @@
 'use client';
 
-import { useEffect } from 'react';
-import { X, MessageSquare, Clock, ChevronRight, Plus, Loader2 } from 'lucide-react';
+/**
+ * components/chat-history-sidebar.tsx — v2 (UX pass)
+ *
+ * CHANGES OVER v1:
+ *   - Backdrop scrim: clicking anywhere outside the panel closes it
+ *     (previously the sidebar could only be closed via the small X).
+ *   - Escape closes the sidebar.
+ *   - "New chat" is a prominent full-width button at the top of the
+ *     list instead of a tiny icon hidden in the header.
+ *   - Sessions are grouped by recency (Today / Yesterday / This week /
+ *     Earlier) with readable relative timestamps via date-fns, so the
+ *     list scans chronologically instead of as a flat wall of rows.
+ *   - Row hierarchy inverted: the conversation preview is the primary
+ *     line (it's what users recognise), quarter + time are metadata.
+ */
+
+import { useEffect, useMemo } from 'react';
+import { X, MessageSquare, Plus, Loader2 } from 'lucide-react';
 import { Button }     from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { cn }         from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatDistanceToNowStrict, isToday, isYesterday, differenceInCalendarDays } from 'date-fns';
 
 import {
   useSessions,
@@ -23,6 +34,17 @@ import {
   useSelectSession,
   useNewSession,
 } from '@/store';
+
+type SessionRow = ReturnType<typeof useSessions>[number];
+
+function groupLabel(date: Date): string {
+  if (isToday(date))     return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  if (differenceInCalendarDays(new Date(), date) < 7) return 'This week';
+  return 'Earlier';
+}
+
+const GROUP_ORDER = ['Today', 'Yesterday', 'This week', 'Earlier'];
 
 export function ChatHistorySidebar() {
   const sessions      = useSessions();
@@ -41,205 +63,172 @@ export function ChatHistorySidebar() {
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Escape closes the sidebar
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeHistory();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, closeHistory]);
+
   const handleSelect = async (sessionId: string) => {
+    closeHistory();
     if (sessionId === activeId) return;
     await selectSession(sessionId);
   };
 
   const handleNew = () => {
+    closeHistory();
     newSession();
   };
 
-  const listVariants = {
-    hidden: {},
-    visible: {
-      transition: {
-        staggerChildren: 0.05,
-      },
-    },
-  };
+  const grouped = useMemo(() => {
+    const visible = sessions.filter(s => (s.messageCount ?? 0) > 0);
+    const groups = new Map<string, SessionRow[]>();
+    for (const s of visible) {
+      const label = groupLabel(new Date(s.createdAt));
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label)!.push(s);
+    }
+    return GROUP_ORDER
+      .filter(label => groups.has(label))
+      .map(label => ({ label, items: groups.get(label)! }));
+  }, [sessions]);
 
-  const itemVariants = {
-    hidden: {
-      opacity: 0,
-      filter: 'blur(4px)',
-    },
-    visible: {
-      opacity: 1,
-      filter: 'blur(0px)',
-      transition: {
-        duration: 0.35,
-        ease: [0.22, 1, 0.36, 1] as const,
-      },
-    },
-    exit: {
-      opacity: 0,
-      transition: {
-        duration: 0.2,
-      },
-    },
-  };
+  const hasSessions = grouped.length > 0;
 
   return (
-    <TooltipProvider delayDuration={300}>
-    <div
-      aria-label="Chat history"
-      className={cn(
-        'fixed top-14 left-0 z-30 h-[calc(100%-56px)] w-72',
-        'bg-background/95 backdrop-blur-md border-r border-border',
-        'shadow-[4px_0_24px_-4px_rgba(0,0,0,0.12)]',
-        'transition-transform duration-300 ease-in-out will-change-transform',
-        'overflow-hidden', // ← prevent any child overflow leaking outside sidebar
-        open ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none',
-      )}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between pl-4 pr-2 h-12 border-b border-border/60 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-sm text-muted-foreground truncate">
-            Previous Chats
-          </span>
+    <>
+      {/* Scrim — click anywhere outside the panel to close */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={closeHistory}
+            aria-hidden="true"
+            className="fixed inset-0 top-14 z-20 bg-black/20 dark:bg-black/40 backdrop-blur-[1px]"
+          />
+        )}
+      </AnimatePresence>
+
+      <aside
+        aria-label="Chat history"
+        className={cn(
+          'fixed top-14 left-0 z-30 h-[calc(100%-56px)] w-72',
+          'bg-background border-r border-border',
+          'shadow-[4px_0_24px_-4px_rgba(0,0,0,0.12)]',
+          'transition-transform duration-300 ease-in-out will-change-transform',
+          'overflow-hidden flex flex-col',
+          open ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none',
+        )}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between pl-4 pr-2 h-12 border-b border-border/60 shrink-0">
+          <span className="font-medium text-sm text-foreground">Chats</span>
+          <Button
+            variant="ghost" size="icon" className="size-7"
+            onClick={closeHistory}
+            aria-label="Close chat history"
+            title="Close (Esc)"
+          >
+            <X className="size-3.5" />
+          </Button>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-7" onClick={handleNew}>
-                <Plus className="size-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>New chat</p>
-            </TooltipContent>
-          </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-7" onClick={closeHistory}>
-                <X className="size-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>Close</p>
-            </TooltipContent>
-          </Tooltip>
+        {/* New chat — the primary action, always visible */}
+        <div className="p-2 shrink-0">
+          <Button
+            variant="outline" size="sm"
+            className="w-full justify-start gap-2 h-9"
+            onClick={handleNew}
+          >
+            <Plus className="size-3.5" />
+            New chat
+          </Button>
         </div>
-      </div>
 
-      {/* Session list — w-full + min-w-0 keep children bounded to sidebar width */}
-      <ScrollArea className="h-[calc(100%-48px)] w-full">
-        <div className="p-2 space-y-1 w-72 min-w-0">
+        {/* Session list */}
+        <ScrollArea className="flex-1 min-h-0 w-full">
+          <div className="px-2 pb-4 w-72 min-w-0">
+            {loading && !hasSessions && (
+              <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                <span className="text-xs">Loading sessions…</span>
+              </div>
+            )}
 
-          {(() => {
-            const visibleSessions = sessions.filter(s => (s.messageCount ?? 0) > 0);
+            {!loading && !hasSessions && (
+              <div className="flex flex-col items-center gap-2 py-12 px-4 text-center">
+                <MessageSquare className="size-8 text-muted-foreground/30" />
+                <p className="text-xs text-muted-foreground">No previous chats yet</p>
+                <p className="text-xs text-muted-foreground/60">
+                  Conversations appear here once you send a message.
+                </p>
+              </div>
+            )}
 
-            return (
-              <>
-                {loading && (
-                  <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
-                    <Loader2 className="size-3.5 animate-spin" />
-                    <span className="text-xs">Loading sessions…</span>
-                  </div>
-                )}
+            {grouped.map(({ label, items }) => (
+              <div key={label} className="mt-2">
+                <p className="px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60">
+                  {label}
+                </p>
+                <div className="space-y-0.5">
+                  {items.map((s) => {
+                    const isActive = s.sessionId === activeId;
+                    // Previews are raw message text — strip markdown markers
+                    // so titles read as plain sentences.
+                    const title =
+                      s.preview?.replace(/[*_`#]/g, '').trim() ||
+                      s.quarter ||
+                      'New conversation';
+                    const when     = formatDistanceToNowStrict(new Date(s.createdAt), { addSuffix: true });
 
-                {!loading && visibleSessions.length === 0 && (
-                  <div className="flex flex-col items-center gap-2 py-12 px-4 text-center">
-                    <MessageSquare className="size-8 text-muted-foreground/30" />
-                    <p className="text-xs text-muted-foreground">No previous sessions</p>
-                    <Button variant="outline" size="sm" className="mt-2 text-xs h-7" onClick={handleNew}>
-                      <Plus className="size-3 mr-1" />
-                      Start new chat
-                    </Button>
-                  </div>
-                )}
-
-                <AnimatePresence mode="popLayout">
-                  <motion.div
-                    variants={listVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="space-y-1 w-full min-w-0"
-                  >
-                    {visibleSessions.map((s) => {
-                      const isActive = s.sessionId === activeId;
-
-                return (
-                  <motion.div
-                    key={s.sessionId}
-                    variants={itemVariants}
-                    layout
-                    exit="exit"
-                    className="w-full min-w-0"
-                  >
-                    <button
-                      onClick={() => handleSelect(s.sessionId)}
-                      className={cn(
-                        'w-full max-w-full text-left px-3 py-2.5 rounded-lg border transition-all duration-150 group',
-                        'overflow-hidden', // ← guarantees nothing inside escapes
-                        isActive
-                          ? 'bg-violet-500/10 border-violet-500/40 shadow-sm'
-                          : 'bg-transparent border-transparent hover:bg-muted/60 hover:border-border/60',
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2 w-full min-w-0">
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                          <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
-                            <span
-                              className={cn(
-                                'text-xs font-medium truncate',
-                                isActive
-                                  ? 'text-violet-600 dark:text-violet-400'
-                                  : 'text-foreground',
-                              )}
-                            >
-                              {s.quarter || 'General'}
-                            </span>
-
-                            <span className="text-xs text-muted-foreground/60 shrink-0">
-                              · {s.messageCount ?? 0} msg
-                              {(s.messageCount ?? 0) !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-
-                          {s.preview && (
-                            <p className="text-xs text-muted-foreground truncate leading-snug">
-                              {s.preview}
-                            </p>
-                          )}
-
-                          <div className="flex items-center gap-1 mt-1 min-w-0">
-                            <Clock className="size-2.5 text-muted-foreground/40 shrink-0" />
-
-                            <span className="text-xs text-muted-foreground/40 truncate">
-                              {new Date(s.createdAt).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </span>
-                          </div>
-                        </div>
-
-                        <ChevronRight
+                    return (
+                      <button
+                        key={s.sessionId}
+                        onClick={() => handleSelect(s.sessionId)}
+                        aria-current={isActive ? 'true' : undefined}
+                        className={cn(
+                          'w-full max-w-full text-left px-2.5 py-2 rounded-lg border transition-colors duration-150 group overflow-hidden',
+                          isActive
+                            ? 'bg-violet-500/10 border-violet-500/40'
+                            : 'bg-transparent border-transparent hover:bg-muted/60',
+                        )}
+                      >
+                        {/* Primary line: what the conversation was about */}
+                        <p
                           className={cn(
-                            'size-3 shrink-0 mt-1 transition-opacity',
+                            'text-xs truncate leading-snug',
                             isActive
-                              ? 'text-violet-500 opacity-100'
-                              : 'text-muted-foreground/30 opacity-0 group-hover:opacity-100',
+                              ? 'text-violet-700 dark:text-violet-300 font-medium'
+                              : 'text-foreground',
                           )}
-                        />
-                      </div>
-                    </button>
-                  </motion.div>
-                );
-                    })}
-                  </motion.div>
-                </AnimatePresence>
-              </>
-            );
-          })()}
-        </div>
-      </ScrollArea>
-    </div>
-    </TooltipProvider>
+                        >
+                          {title}
+                        </p>
+                        {/* Metadata line: quarter tag + relative time */}
+                        <p className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground/60 truncate">
+                          {s.quarter && (
+                            <span className="font-mono uppercase tracking-wide">{s.quarter}</span>
+                          )}
+                          {s.quarter && <span aria-hidden="true">·</span>}
+                          <span>{when}</span>
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </aside>
+    </>
   );
 }
