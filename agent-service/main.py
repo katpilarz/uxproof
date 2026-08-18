@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
     print(f"    Ollama: {OLLAMA_BASE}")
     print(f"    Sanity project: {os.getenv('SANITY_PROJECT_ID', '(not set)')}")
     yield
-    print("🛑  AutoGen service stopped")
+    print("🛑  agent service stopped")
 
 
 app = FastAPI(title="uxproof Agent Service", lifespan=lifespan)

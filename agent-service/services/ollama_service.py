@@ -2,17 +2,14 @@
 services/ollama_service.py
 
 Direct httpx wrapper for the Ollama OpenAI-compatible endpoint.
-Used by ExtractionAgent and PlanningAgent (which call Ollama directly,
-not through AutoGen). The CoordinatorAgent uses OllamaChatCompletionClient
-from autogen-ext instead — see coordinator_agent.py.
+Used by ExtractionAgent and PlanningAgent, which call Ollama directly.
 """
 import os
 import json
 import httpx
 from typing import AsyncIterator
 
-# AutoGen 0.4 expects just the host:port, no /v1 suffix on OllamaChatCompletionClient.
-# For direct httpx calls we still need the full /v1 path.
+# OLLAMA_BASE_URL is host:port; direct httpx calls need the full /v1 path.
 OLLAMA_BASE  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL",    "qwen2.5:14b")
 TIMEOUT      = 180

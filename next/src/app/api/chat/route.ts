@@ -9,7 +9,7 @@
 // CHANGES OVER v1:
 //
 //   1. PRESENTATION INTENT NOW DELEGATES TO unified-agent.
-//      Previously this route called AutoGen directly and ran the response
+//      Previously this route called the agent service directly and ran the response
 //      through formatIntelligence(), which produced the "AI Executive
 //      Intelligence" markdown dump regardless of whether the user wanted
 //      a presentation or an analysis. v2 routes presentation requests
@@ -30,7 +30,7 @@
 //      front-end's "Generate & download .pptx" handler can pass them
 //      through to /api/presentations.
 //
-//   4. DEEP path unchanged. "Deep analysis Q3 2025" still calls AutoGen
+//   4. DEEP path unchanged. "Deep analysis Q3 2025" still calls the agent service
 //      and uses formatIntelligence() to render the full report — that's
 //      what the user is actually asking for in that case.
 
@@ -39,7 +39,7 @@ import { createUnifiedAI } from '@/lib/agents/unified-agent';
 import { AIContext } from '@/types';
 import { createChatSession, appendMessageToSession } from '@/lib/sanity';
 
-const AUTOGEN_URL = process.env.AUTOGEN_SERVICE_URL || 'http://localhost:8001';
+const AGENT_SERVICE = process.env.AGENT_SERVICE_URL || 'http://localhost:8001';
 
 // ─── Intent classification ────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ function detectScope(message: string): 'year' | 'quarter' {
   return 'quarter';
 }
 
-// ─── AutoGen intelligence formatter (used by 'deep' intent only) ─────────────
+// ─── Agent-pipeline intelligence formatter (used by 'deep' intent only) ─────────────
 
 function formatIntelligence(
   intelligence: Record<string, any>,
@@ -162,13 +162,13 @@ function formatIntelligence(
   return parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-// ─── AutoGen call (deep intent only in v2) ───────────────────────────────────
+// ─── Agent-pipeline call (deep intent only) ───────────────────────────────────
 
-async function callAutoGen(message: string) {
+async function callAgentPipeline(message: string) {
   const { quarter, year } = extractPeriod(message);
 
   const t0  = Date.now();
-  const res = await fetch(`${AUTOGEN_URL}/api/agents/run`, {
+  const res = await fetch(`${AGENT_SERVICE}/api/agents/run`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({
@@ -183,12 +183,12 @@ async function callAutoGen(message: string) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(`AutoGen error (${res.status}): ${text}`);
+    throw new Error(`Agent service error (${res.status}): ${text}`);
   }
 
   const data = await res.json();
   if (data.status !== 'completed') {
-    throw new Error(data.error || 'AutoGen pipeline did not complete');
+    throw new Error(data.error || 'Agent pipeline did not complete');
   }
 
   return {
@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
     let contextRefOverride:  { project: string; quarter: string } | undefined = undefined;
 
     if (intent === 'casual') {
-      // Casual / meta — local reply, no Sanity, no AutoGen, no contextRef
+      // Casual / meta — local reply, no Sanity, no agent service, no contextRef
       responseContent    = casualReply(message);
       agentInfo          = { agent: 'uxproof assistant', processingTime: '0.0s' };
       contextRefOverride = undefined; // signal "no footer" downstream
@@ -273,14 +273,14 @@ export async function POST(request: NextRequest) {
       agentInfo          = response.agentInfo || { agent: 'uxproof assistant', processingTime: '—' };
 
     } else if (intent === 'deep') {
-      // Deep analysis still uses AutoGen + the full-report formatter —
+      // Deep analysis still uses the agent pipeline + the full-report formatter —
       // that's what the user explicitly asked for ("deep analysis…",
       // "full report…", "executive summary…").
-      const result     = await callAutoGen(message);
+      const result     = await callAgentPipeline(message);
       responseContent  = result.content;
       intelligence     = result.intelligence;
       processingType   = 'analysis';
-      agentInfo        = { agent: 'AutoGen Pipeline', processingTime: result.elapsed };
+      agentInfo        = { agent: 'Agent Pipeline', processingTime: result.elapsed };
 
     } else {
       // 'data' — short factual queries: "SUS score for Q4 2025",
@@ -354,8 +354,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id:               Date.now().toString(),
       role:             'assistant',
-      content:          errMsg.includes('AutoGen') || errMsg.includes('fetch')
-        ? 'The AI pipeline could not be reached. Please check that the AutoGen service is running and try again.'
+      content:          errMsg.includes('Agent service') || errMsg.includes('fetch')
+        ? 'The AI pipeline could not be reached. Please check that the agent service is running and try again.'
         : `Failed to generate the requested content. ${errMsg}`,
       timestamp:        new Date(),
       agentInfo:        { agent: 'uxproof assistant', processingTime: '—' },

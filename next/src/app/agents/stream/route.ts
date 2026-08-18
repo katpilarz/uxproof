@@ -11,8 +11,8 @@
 
 import { NextRequest } from 'next/server';
 
-const AUTOGEN_URL =
-  process.env.AUTOGEN_SERVICE_URL || 'http://localhost:8001';
+const AGENT_SERVICE =
+  process.env.AGENT_SERVICE_URL || 'http://localhost:8001';
 
 export const runtime = 'nodejs'; // SSE requires Node.js runtime, not Edge
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
 
   // Forward to Python FastAPI SSE endpoint with a generous timeout
-  const upstream = await fetch(`${AUTOGEN_URL}/api/agents/run/stream`, {
+  const upstream = await fetch(`${AGENT_SERVICE}/api/agents/run/stream`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),

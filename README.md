@@ -20,7 +20,7 @@ database, runs a multi-agent analysis, and renders a fixed 8-slide
 |---|---|---|
 | [next/](next/) | Next.js 16, React 19, Tailwind 4, pptxgenjs, Zustand | Chat UI, unified agent, deck renderer, API routes |
 | [sanity-studio/](sanity-studio/) | Sanity Studio v4 | UX research CMS: reports, intelligence, slide plans |
-| [autogen/](autogen/) | FastAPI, AutoGen, Ollama, Pydantic | ContextAgent → ExtractionAgent → PlanningAgent pipeline |
+| [agent-service/](agent-service/) | FastAPI, Ollama, Pydantic | ContextAgent → ExtractionAgent → PlanningAgent pipeline |
 
 ## The 8-slide deck
 
@@ -40,7 +40,7 @@ accents reserved for data. The single source of truth is
 2. **Fill in env files** (all have `.env.example` templates):
    - `next/.env.local` — `NEXT_PUBLIC_SANITY_PROJECT_ID`, `SANITY_API_TOKEN`
    - `sanity-studio/.env` — `SANITY_STUDIO_PROJECT_ID`
-   - `autogen/.env` — `SANITY_PROJECT_ID`, `SANITY_API_TOKEN`
+   - `agent-service/.env` — `SANITY_PROJECT_ID`, `SANITY_API_TOKEN`
 3. **Seed the demo data**:
    ```bash
    cd sanity-studio
@@ -52,7 +52,7 @@ accents reserved for data. The single source of truth is
    `qwen2.5:14b` pulled — decks still generate without it via
    deterministic fallbacks):
    ```bash
-   cd autogen
+   cd agent-service
    python -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    uvicorn main:app --port 8001

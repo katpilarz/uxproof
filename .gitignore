@@ -1,6 +1,38 @@
-# OS junk
+# ── Dependencies ─────────────────────────────────────────────────────
+node_modules/
+
+# ── Environment & secrets (committed templates excepted) ─────────────
+.env
+.env.*
+!.env.example
+
+# ── Next.js (next/) ──────────────────────────────────────────────────
+next/.next/
+next/out/
+next/build/
+next-env.d.ts
+*.tsbuildinfo
+.vercel/
+
+# Generated decks — keep the folder, never the files
+next/public/downloads/*.pptx
+
+# ── Sanity Studio (sanity-studio/) ───────────────────────────────────
+sanity-studio/dist/
+sanity-studio/.sanity/
+
+# ── Python (agent-service/) ──────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+
+# ── Logs & coverage ──────────────────────────────────────────────────
+*.log
+coverage/
+
+# ── OS & editor junk ─────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-
-# Editors
 .idea/
+.vscode/
+*.pem

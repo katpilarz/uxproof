@@ -1,16 +1,14 @@
 """
-agents/coordinator_agent.py  — AutoGen 0.4 API
+agents/coordinator_agent.py
+
+Drives the deterministic Context → Extraction → Planning sequence.
+Python owns the control flow; Ollama does the intelligence work inside
+each agent (via services/ollama_service.py).
 """
 
 import datetime
-import json
-import os
 import uuid
 from typing import AsyncGenerator
-
-from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.base import TaskResult
-from autogen_ext.models.ollama import OllamaChatCompletionClient
 
 from orchestration.tools import (
     tool_build_context,
@@ -20,35 +18,6 @@ from orchestration.tools import (
 
 from orchestration.state import save as save_state
 from schemas.pipeline_state import AgentStatus, PipelineState
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# ENV
-# ──────────────────────────────────────────────────────────────────────────────
-
-OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:14b")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# MODEL CLIENT
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _make_model_client() -> OllamaChatCompletionClient:
-    return OllamaChatCompletionClient(
-        model=OLLAMA_MODEL,
-        host=OLLAMA_BASE,
-        model_info={
-            "vision": False,
-            "function_calling": True,
-            "json_output": True,
-            "family": "unknown",
-        },
-        options={
-            "temperature": 0.0,
-            "num_predict": 2048,
-        },
-    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
