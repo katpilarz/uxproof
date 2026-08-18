@@ -1,0 +1,61 @@
+# uxproof — project rules for Claude
+
+## Project context
+
+uxproof is an internal tool by PAISAK4U (Katarzyna Pilarz) that turns quarterly UX
+research data into client-ready, PAISAK4U-branded 8-slide PowerPoint decks. The user
+asks in plain language ("Analyse Q3 2025", "Compare Q2 vs Q3"); the system queries the
+research database, runs a multi-agent analysis, and renders a fixed .pptx deck.
+The bundled dataset (client "Aurelo") is 100% fictional demo data.
+
+### Architecture (monorepo, three services)
+
+| Directory | Stack | Role |
+|---|---|---|
+| `next/` | Next.js 16, React 19, Tailwind 4, Zustand, pptxgenjs | Chat UI, unified agent, deck renderer, API routes |
+| `sanity-studio/` | Sanity Studio v4 | UX research CMS: reports, intelligence, slide plans (project `ygdze74e`, dataset `production`) |
+| `agent-service/` | FastAPI, Pydantic, Ollama (`qwen2.5:14b`) | ContextAgent → ExtractionAgent → PlanningAgent pipeline, hand-rolled orchestration in `orchestration/pipeline.py` |
+
+Data flow: Next.js chat → FastAPI pipeline → Sanity (GROQ) → slide plan → pptxgenjs
+render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is local at
+`OLLAMA_BASE_URL`; an optional LM Studio endpoint serves the Next.js side.
+
+### Engineering principles (uphold these in every change)
+
+- **The LLM never invents data.** Every number in a deck (SUS scores, trends, UX
+  indicators) is read from Sanity, never generated. The LLM selects and narrates only.
+  Do not write code that lets model output supply metric values.
+- **LLM as enhancement, not dependency.** Every LLM step has a deterministic fallback;
+  decks must still generate with Ollama down. Never add a hard dependency on model
+  availability or on well-formed model output.
+- **Typed contracts between agents.** Agents hand off Pydantic-validated objects
+  (`agent-service/schemas/`), not free text. A bad LLM response should fail validation
+  loudly, not corrupt the deck silently. Keep schemas in sync with the GROQ
+  projections and TypeScript types (`next/src/types/`).
+- **The deliverable is deterministic; only content selection is intelligent.** The deck
+  is a fixed 8-slide template (Cover → SUS headline → trend chart → 8 indicators →
+  top issues → recommendations → summary → thank-you). Don't make slide structure or
+  styling model-driven.
+- **Single brand source of truth:** `next/src/lib/branding/brand.ts` (paisak4u.com
+  style — black/white, Schibsted Grotesk + IBM Plex Mono, hairline rules; violet /
+  graphite / pink reserved for data). Never hardcode brand values elsewhere.
+- **Local-only inference is a product feature.** Client research data never leaves the
+  machine. Do not introduce cloud LLM calls or send research data to external services.
+- **No orchestration frameworks.** The pipeline is deliberately hand-rolled (AutoGen
+  was removed as an unused dependency). Don't reintroduce agent frameworks.
+
+### Dev workflow
+
+- Next.js app: `cd next && npm run dev`. Agent service: `cd agent-service &&
+  uvicorn main:app --port 8001` (venv `.venv`, `requirements.txt`). Studio:
+  `cd sanity-studio && npm run dev` (port 3333).
+- Re-seed demo data: `npx sanity dataset import seed-reports.ndjson production
+  --replace` from `sanity-studio/`.
+- Sanity project ID (`ygdze74e`) is public and committed as a fallback; API tokens are
+  env-only.
+
+## Git & GitHub policy
+
+- **Never commit, push, or open PRs without explicit user permission.** This applies every time — a granted permission covers that one action only and does not carry over to later commits or pushes. Staging files (`git add`) to show a proposed change is fine; creating commits is not.
+- **Never credit Claude as a contributor.** Do not add `Co-Authored-By: Claude ...` trailers to commit messages, do not append "Generated with Claude Code" (or similar) to commit messages or PR descriptions, and do not list Claude/AI as an author or contributor anywhere in the repo (README, package.json, docs). Commits are authored solely by the user.
+- Never commit real secrets or tokens. Real values live in gitignored env files (`next/.env.local`, `agent-service/.env`, `sanity-studio/.env`); the `.env.example` files keep placeholders only.
