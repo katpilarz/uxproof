@@ -18,11 +18,8 @@
  *   Source chain:
  *     chat_route.ts v2 emits these on the response →
  *     chat-slice.ts v2 stores them on Message →
- *     this file reads them via `(message as any).field` →
+ *     this file reads them (typed on Message via AssistantMessageMeta) →
  *     PresentationPreview v2 builds the right body for /api/presentations.
- *
- *   The cast to `any` is a lightweight bridge — Message type can be
- *   updated separately to make these official fields.
  *
  * v1 fixes retained:
  *   1. shouldStream condition: removed !isProcessing gate.
@@ -224,13 +221,9 @@ export function ChatInterface() {
               && !streamedIds.has(message.id)
               && !message.isError;
 
-            // v2: read the three new fields from the assistant message.
-            // Cast to `any` to avoid touching the Message type definition
-            // for now — chat-slice.ts v2 stores them on the message dict.
-            const presentationScope = (message as any).presentationScope as
-              | 'quarter' | 'year' | undefined;
-            const messageYear    = (message as any).year    as number | undefined;
-            const messageQuarter = (message as any).quarter as string | undefined;
+            const presentationScope = message.presentationScope;
+            const messageYear       = message.year;
+            const messageQuarter    = message.quarter;
 
             return (
               <motion.div

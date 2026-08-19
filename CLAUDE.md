@@ -18,7 +18,7 @@ The bundled dataset (client "Aurelo") is 100% fictional demo data.
 
 Data flow: Next.js chat → FastAPI pipeline → Sanity (GROQ) → slide plan → pptxgenjs
 render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is local at
-`OLLAMA_BASE_URL`; an optional LM Studio endpoint serves the Next.js side.
+`OLLAMA_BASE_URL`; the Next.js side calls the same local Ollama instance.
 
 ### Engineering principles (uphold these in every change)
 
