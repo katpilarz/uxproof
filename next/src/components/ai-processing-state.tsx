@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * components/ai-processing-state.tsx
  *

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * components/presentation-download-button.tsx — v2
  *

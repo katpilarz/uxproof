@@ -64,6 +64,11 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   machine. Do not introduce cloud LLM calls or send research data to external services.
 - **No orchestration frameworks.** The pipeline is deliberately hand-rolled (AutoGen
   was removed as an unused dependency). Don't reintroduce agent frameworks.
+- **Next.js server/client convention:** every file under `next/src/app/` that is a
+  page or layout stays a **server component** (no `'use client'` — SSR is the
+  default); every component under `next/src/components/` carries `'use client'`.
+  Pages are thin: resolve async `params` and render a `*-view.tsx` client
+  component — all hooks, store access, and animation live in `components/`.
 
 ### Dev workflow
 
