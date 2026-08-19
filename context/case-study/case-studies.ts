@@ -59,18 +59,18 @@ export const caseStudies: CaseStudy[] = [
     slug: "uxproof",
     index: "01",
     title: "uxproof — AI research reporting",
-    tag: "AI product / Multi-agent system",
+    tag: "AI product / UX engineering / Human-AI collaboration",
     year: "2026",
     status: "Built",
     summary:
-      "[ A chat-first AI tool that turns uploaded UX research into client-ready, brand-locked PowerPoint decks — grounded numbers, deterministic fallbacks. ]",
+      "[ Designing and building a trustworthy AI workflow — from messy research files to a client-ready deck, without giving the AI control over facts, structure or quality. ]",
     card: {
       problem:
-        "Quarterly UX research was slow to turn into client decks — and an AI presenting research to clients cannot hallucinate a single number.",
+        "Quarterly UX research was slow to turn into client decks — and an AI presenting research to clients cannot invent a single number.",
       approach:
-        "A chat-first interface over a multi-agent pipeline. Uploads ground every figure; a local LLM enhances answers, never carries them.",
+        "I designed the interaction model and built the interface end-to-end in React/TypeScript. The AI helps decide what to say; it never decides what is true.",
       result:
-        "Brand-locked eight-slide decks from plain language — every number traceable, and decks still generate with the model offline.",
+        "Client-ready eight-slide decks from plain language — every number traceable, and the workflow keeps working with the model offline.",
     },
     ledger: [
       {
@@ -79,7 +79,7 @@ export const caseStudies: CaseStudy[] = [
       },
       {
         k: "[ Role ]",
-        v: "Solo build — product concept, UX, frontend, agent pipeline, deck renderer",
+        v: "Solo, end-to-end — interaction model, UX, React/TypeScript frontend, AI behaviour, deck renderer",
       },
       {
         k: "[ Stack ]",
@@ -89,19 +89,16 @@ export const caseStudies: CaseStudy[] = [
         k: "[ Constraints ]",
         v: "Local-only inference — research data never leaves the machine; no orchestration frameworks",
       },
-      {
-        k: "[ Provenance ]",
-        v: "A concept, not a commercial product — the patterns it demonstrates (grounding gates, typed contracts, deterministic fallbacks) come from production systems I've shipped",
-      },
       { k: "[ Status ]", v: "Working concept — built end-to-end, 2026" },
+      { k: "[ Link ]", v: "Live demo — available soon" },
     ],
     sections: [
       {
         heading: "Context",
         lead: "Upload the research, talk to it, get the deck.",
         body: [
-          "Quarterly UX research kept ending its life in slide decks. Every cycle meant pulling SUS scores, KPIs and findings out of files by hand, rebuilding the same slide structures, and hoping the numbers survived the copy-paste. uxproof is the tool I built to close that gap.",
-          "A note on what this is: a concept build, not a production product. It runs end-to-end on my own research practice — real uploads, real decks — but it exists to demonstrate an architecture, not to ship to customers. The patterns inside it are the same ones I've used in production AI products built under NDA; uxproof is the version I can show.",
+          "Quarterly UX research kept ending its life in slide decks. Every cycle meant pulling SUS scores, KPIs and findings out of different files, rebuilding the same slide structures, and checking the numbers survived the journey. I built uxproof to close that gap: a chat-first interface over grounded research data and an automated presentation workflow.",
+          "It's a self-initiated concept build rather than a commercial product — the one I can show publicly. The UX engineering patterns behind it — AI boundaries, design systems, accessibility, edge states, production-quality frontend — are informed by my experience building enterprise GenAI products.",
         ],
         image: {
           src: "/uxproof-mockup.jpg",
@@ -110,84 +107,85 @@ export const caseStudies: CaseStudy[] = [
         },
       },
       {
-        heading: "Workflow",
-        lead: "Plain language is the whole interface.",
+        heading: "The UX problem",
+        lead: "AI makes the workflow shorter — but trust becomes part of the interface.",
         body: [
-          "The workflow is chat-first and upload-grounded. Research files go in through the chat's plus button; structured data — quarter, year, SUS score — is parsed into per-user reports, and prose documents are converted by a local model under a strict guardrail. From there it's plain language: “Analyse Q3 2025”, “Compare Q2 vs Q3”, “Generate the 2025 presentation”.",
-          "The conversation itself is designed, not just parsed. A bare “yes” after the tool offers a presentation becomes a real generation request; a follow-up question with no period named inherits the last one discussed; a workspace with no data gets an upload prompt instead of machinery running on nothing.",
+          "The obvious interaction is simple: upload → ask → receive an answer → generate the presentation. The difficult part is everything underneath that apparently simple flow — an AI that presents research to clients cannot occasionally invent a number; it has to be trustworthy every time.",
+          "That created three UX requirements: users interact naturally instead of learning an AI workflow; the interface clearly communicates what the system knows, what it is doing, and when something cannot be verified; and the experience stays useful when the AI is slow, unavailable or unable to produce a trustworthy answer. AI behaviour is treated as interaction design, not a black-box backend concern.",
         ],
       },
       {
-        heading: "Problem",
-        lead: "An AI that presents research to clients cannot hallucinate a number — not rarely, never.",
+        heading: "Interaction model",
+        lead: "Plain language is the interface — but the system still needs structure.",
         body: [
-          "That one requirement disqualifies the default “let the LLM write the deck” architecture before you start.",
-          "Two more constraints shaped the system: research data is confidential, so inference had to stay on the machine; and a local model will sometimes be slow, wrong, or simply down — so the product had to keep working without it.",
+          "The workflow is chat-first and grounded in uploaded research: “Analyse Q3 2025”, “Compare Q2 vs Q3”, “Generate the 2025 presentation”. The interface translates natural-language requests into structured product actions.",
+          "The conversation itself is a designed product surface. A bare “yes” after the system offers a presentation becomes a real generation request; a follow-up without a newly specified period inherits the context of the previous exchange; an empty workspace shows a clear upload prompt instead of exposing machinery. The complexity of the underlying system disappears from the user's workflow — without hiding important system states.",
         ],
       },
       {
-        heading: "Thinking model",
-        lead: "Decide what the model may own before deciding what it can do.",
+        heading: "Designing for trust",
+        lead: "The AI can help decide what to say. It cannot decide what is true.",
         body: [
-          "The first design artefact wasn't a screen — it was a boundary. Everything the model may own sits on one side: selecting which findings matter, narrating them, converting prose into a report shape. Everything it may never touch sits on the other: the numbers, the slide structure, the styling, and whether the product works at all.",
-          "Between the two sits a validation gate — typed contracts and literal-value checks — and output that fails it is discarded, not repaired. Once that boundary existed, most decisions stopped being debates: every guardrail, fallback and edge state in the product is the same boundary applied to another surface.",
-        ],
-        image: {
-          src: "/uxproof-diagram-authority.svg",
-          caption:
-            "[ THINKING MODEL — DIVISION OF AUTHORITY: WHAT THE MODEL MAY OWN, WHAT CODE MUST ]",
-          alt: "Diagram of uxproof's division of authority: the model owns selection and narration on the left, code owns numbers, structure, styling and availability on the right, with a validation gate between them",
-        },
-      },
-      {
-        heading: "Approach",
-        lead: "Every number grounded, every model step backed by a deterministic fallback.",
-        body: [
-          "[ Grounding ] Structured uploads are parsed deterministically. Prose documents go through a model conversion with a literal-value guardrail: every numeric field must appear verbatim in the source text or it is dropped, and a report without a grounded score is rejected outright. The same rule polices chat answers and document summaries — any reply whose numbers can't be traced to stored data is discarded in favour of its deterministic template.",
-          "[ Fallbacks ] The LLM is an enhancement, never a dependency. Every model step has a deterministic fallback: conversational answers fall back to templated ones, summaries to excerpts, extraction and planning to rule-built equivalents. With the model completely offline, decks still generate.",
-          "[ Deliverable ] The output is a fixed eight-slide monochrome PowerPoint template. The model selects and narrates content; deterministic rendering rules own layout, typography and branding. The deck cannot drift, because the model never touches it.",
+          "The most important design decision was a clear boundary between AI-generated content and deterministic product behaviour. The model can select relevant findings, narrate research, convert prose into a structured report, and help interpret the user's request. It cannot invent numbers, control presentation structure or styling, or decide whether the product can safely complete an operation.",
+          "Between those responsibilities sits a validation layer: a number that cannot be grounded in the uploaded source is discarded, never repaired or guessed. That distinction became a UX principle as much as an architectural one — the interface never presents uncertainty as certainty.",
+          "The gate is unit-tested rather than assumed. The suite pins down what the product accepts, what it drops, and the deliberately conservative bias behind it: a value the document phrases differently is dropped even though it's present, because a missing field is an inconvenience and an invented number is the end of trust.",
         ],
         gallery: [
+          {
+            src: "/uxproof-diagram-authority.svg",
+            caption:
+              "[ DIVISION OF AUTHORITY — WHAT THE MODEL MAY OWN, WHAT CODE MUST ]",
+            alt: "Diagram of uxproof's division of authority: the model owns selection and narration on the left, code owns numbers, structure, styling and availability on the right, with a validation gate between them",
+          },
           {
             src: "/uxproof-diagram-guardrail.svg",
             caption: "[ THE GROUNDING GATE — HOW PROSE BECOMES A REPORT, OR DOESN'T ]",
             alt: "Flow diagram of the grounding gate: an uploaded document passes through model conversion, then two gates — each number must appear literally in the source or the field is dropped, and without a grounded SUS score no report is created at all",
           },
-          {
-            src: "/uxproof-diagram-fallbacks.svg",
-            caption: "[ THE FALLBACK LADDER — WHAT EACH MODEL STEP DEGRADES TO ]",
-            alt: "Diagram pairing each model step with its deterministic fallback: conversational answers fall back to templates, summaries to excerpts, prose conversion to reference storage, extraction and planning to rule-built equivalents",
-          },
         ],
       },
       {
-        heading: "Edge states",
-        lead: "The unhappy paths are the product.",
+        heading: "Building the experience",
+        lead: "The interface is designed and implemented together.",
         body: [
-          "Every failure mode is a designed state, not an error toast. The model being offline is one of them: chat answers fall back to deterministic templates, summaries to excerpts, slide plans to rule-built equivalents — the tool keeps working, quietly. A number that can't be grounded in the source is discarded, never shown.",
-          "The same care runs through the quieter corners: an empty workspace gets an upload prompt instead of somebody else's demo data; a restored chat session renders its presentation cards idle rather than re-firing old generations; a document without a verifiable score is kept as reference context instead of becoming a fake report.",
+          "I built the product in React, Next.js and TypeScript, treating interaction design and implementation as one workflow rather than a hand-off. That meant owning component behaviour, state transitions, loading and generation states, keyboard interaction, focus management, error handling, responsive behaviour, content hierarchy and reusable UI patterns as one set of decisions.",
+          "This is the part of the work I value most as a UX engineer: taking an interaction from idea or prototype to something that is actually robust in code — shaped around the same model as the product design, simple on the surface, explicit underneath.",
         ],
         image: {
           src: "/uxproof-mockup.jpg",
           caption:
-            "[ PLACEHOLDER — EDGE-STATE FRAMES: MODEL OFFLINE, UNGROUNDED NUMBER, EMPTY WORKSPACE — SWAP FOR UI STATES ]",
-          alt: "Placeholder for a set of uxproof edge-state frames: the model-offline fallback, a discarded ungrounded number, and the empty-workspace upload prompt",
+            "[ PLACEHOLDER — GENERATION CARD STATES: IDLE / WORKING / DONE / ERROR — SWAP FOR PRODUCT SHOTS ]",
+          alt: "Placeholder for product shots of the presentation card moving through its idle, working, complete and error states",
         },
       },
       {
-        heading: "Interaction quality",
-        lead: "Craft you can tab through: labelled, announced, keyboard-complete.",
+        heading: "Edge states",
+        lead: "The unhappy paths are part of the experience.",
         body: [
-          "The chat surface is fully keyboard-operable. Every icon-only control — upload, send, history, account — carries a real label; focus rings are visible on every interactive element; and hover-revealed actions, like deleting a conversation, also reveal on keyboard focus, so nothing in the product is pointer-only.",
-          "State changes are announced, not just painted: toasts are polite live regions, errors are alerts, expandable summaries expose their open state, and the active conversation is marked for assistive tech. Uploads render optimistically, generation cards move through honest idle / working / done / error states, and a restored session never silently re-fires an old generation.",
+          "AI products expose more failure modes than conventional interfaces, so those states are first-class UX, not technical exceptions. When the local model is unavailable, the product falls back to deterministic behaviour — templated answers, excerpt summaries, rule-built plans — and the user doesn't need to understand the architecture to keep working.",
+          "The quieter states are designed too: an empty workspace prompts for an upload; an ungrounded number is discarded rather than displayed; a document without a verifiable score stays useful as reference context instead of becoming a report; restored sessions never silently re-run old generations; presentation cards communicate idle, working, complete and error honestly. Failure changes the experience honestly — it doesn't just produce an error message.",
+        ],
+        image: {
+          src: "/uxproof-diagram-fallbacks.svg",
+          caption: "[ THE FALLBACK LADDER — WHAT EACH MODEL STEP DEGRADES TO ]",
+          alt: "Diagram pairing each model step with its deterministic fallback: conversational answers fall back to templates, summaries to excerpts, prose conversion to reference storage, extraction and planning to rule-built equivalents",
+        },
+      },
+      {
+        heading: "Accessibility & interaction quality",
+        lead: "Every interaction works beyond the happy path — and beyond the mouse.",
+        body: [
+          "The chat surface is fully keyboard-operable. Icon-only actions — upload, send, history, account — carry accessible labels; focus states are visible on every interactive element; and actions that appear on hover are equally available through keyboard focus, so nothing is pointer-only.",
+          "State changes are communicated semantically, not just visually: toasts are polite live regions, errors are exposed as alerts, expandable content exposes its state, and the active conversation is marked for assistive technology. Motion is an enhancement rather than a requirement — the interface honours the operating system's reduced-motion preference, in both the animation library and the stylesheet.",
+          "Asynchronous behaviour is part of accessibility too: uploads render optimistically, generation states are explicit, and restored sessions never unexpectedly restart old work. None of this is a layer added after the UI was designed — the interaction model itself is built around predictable state and feedback.",
         ],
       },
       {
         heading: "Design system",
-        lead: "Consistency enforced in code, not in a PDF.",
+        lead: "Consistency belongs in the implementation, not in a document.",
         body: [
-          "The deck has a single source of truth: one branding module owns the palette, type and geometry, and one fixed eight-slide structure is enforced at render time. There is no way to ship an off-brand slide, because layout never passes through the model — the plan selects and narrates content, deterministic rules draw it.",
-          "The same pattern scales beyond decks: typed content blocks — KPIs, charts, issues, priorities — share one shape across the schema, the pipeline and the renderer, so a new slide element is added as one contract and understood everywhere.",
+          "The presentation output has one branding module for palette, typography and geometry, and one fixed eight-slide structure enforced at render time. The AI selects and narrates content; deterministic rules own layout and styling — there is no way to ship an off-brand slide.",
+          "The same principle runs through the product: typed content blocks — KPIs, charts, issues, priorities — share one shape across the schema, the application and the pipeline, so a new content type means extending a contract rather than creating another one-off. That's what a design system is most useful for: not just visual consistency, but reducing the number of decisions every future feature has to make.",
         ],
         image: {
           src: "/uxproof-diagram-contracts.svg",
@@ -198,10 +196,10 @@ export const caseStudies: CaseStudy[] = [
       },
       {
         heading: "Architecture",
-        lead: "Three services, one rule: the model never owns the numbers.",
+        lead: "The architecture exists to protect the experience.",
         body: [
-          "Three services with clean seams: a Next.js app that owns chat, uploads and deck rendering; a FastAPI agent service that builds slide plans; and a headless CMS as the single store for reports, sessions and plans. Inference runs on a local model, so research data never leaves the machine.",
-          "Deck content comes from a hand-rolled multi-agent sequence — context, extraction, planning. Plain Python, no orchestration framework. Agents exchange typed Pydantic contracts, so malformed model output fails loudly at a validation boundary instead of leaking into a client deck.",
+          "The system splits into clear responsibilities: a Next.js application owns the interface, chat, uploads and deck rendering; a FastAPI service builds slide plans; a content store holds reports, sessions and plans; and a local model provides inference, so research data never leaves the machine. Typed contracts validate every model-driven step — malformed output fails loudly at a seam instead of leaking into a client deck.",
+          "The architecture deliberately mirrors the UX boundary set earlier: the model contributes intelligence, while deterministic code protects facts, structure, styling and availability. The technical design isn't separate from the user experience — it is what makes the intended experience reliable.",
         ],
         image: {
           src: "/uxproof-diagram-architecture.svg",
@@ -211,20 +209,19 @@ export const caseStudies: CaseStudy[] = [
         },
       },
       {
-        heading: "AI-assisted workflow",
-        lead: "AI drafts fast; the quality bar is codified, not remembered.",
+        heading: "AI-assisted engineering",
+        lead: "AI accelerates implementation. The quality bar still belongs to the engineer.",
         body: [
-          "uxproof is built with an agentic AI pair, and the division of labour is deliberate: generation is fast at scaffolding — components, refactors, test plumbing — while I take over where judgement lives: interaction details, edge states, accessibility passes, visual polish.",
-          "The review bar doesn't live in my head — it lives in the repo. A project brief encodes the invariants every generated change is checked against: numbers are never model-authored, every model step has a fallback, the deck template has one source of truth, pages stay server components while interaction lives in client components. A small fleet of custom agents runs the ceremony around the code — a documentarian that regenerates the architecture document from what's actually on disk, an auditor that reviews changes against the invariants, a tester that writes versioned readiness reports. Drift gets caught by process, not memory.",
-          "One concrete example of what that looks like in practice: generated output kept nudging the deck renderer toward one-off spacing values and accent colours — each instance easy to fix, none of them staying fixed. The answer wasn't another review comment; it was codifying the rule into the brief and the branding module, so every future draft — mine or the model's — is checked against it automatically.",
+          "uxproof is built with an AI-assisted development workflow. Generation is effective at scaffolding, repetitive implementation, refactoring and test plumbing; I own the parts where product and UX judgement matter — interaction quality, accessibility, edge states, visual consistency, and the relationship between design intent and implementation.",
+          "The quality bar is codified in the project rather than relying on memory: numbers are never model-authored, every model step has a fallback, the presentation template has one source of truth, and generated UI must conform to the established system. When generated output repeatedly introduced one-off spacing values and accent colours into the deck renderer, the fix wasn't correcting each instance — I moved the rule into the branding module and the project constraints, so future generated code is constrained by the system itself. That's the role of AI-assisted development: move faster without lowering the UX quality bar.",
         ],
       },
       {
         heading: "Outcome",
-        lead: "From an evening of manual assembly to a sentence in a chat box.",
+        lead: "A complex research-to-presentation workflow becomes a sentence in a chat box.",
         body: [
-          "Ask for a period, a comparison, or a year in review, and a client-ready deck renders on demand — same structure, same branding, every time.",
-          "Every number in every deck is traceable: read from a stored report, or validated to appear literally in an uploaded document. And because inference runs locally, research data never leaves the machine.",
+          "Upload research, ask for a period or a comparison, request a presentation — no reporting workflow to navigate. The resulting deck uses the same structure and branding every time; every number is read from stored research or validated against the uploaded source; and deterministic fallbacks keep the core workflow functional when the AI is unavailable.",
+          "It demonstrates the principle I design AI interfaces around: the best AI experience is not the one that exposes the most intelligence — it's the one that makes useful intelligence feel predictable, understandable and trustworthy.",
         ],
         image: {
           src: "/uxproof-mockup.jpg",
@@ -233,10 +230,11 @@ export const caseStudies: CaseStudy[] = [
         },
       },
       {
-        heading: "What I'd tell the next team",
-        lead: "Guardrails that discard beat prompts that plead.",
+        heading: "What I'd carry forward",
+        lead: "Design the boundary before designing the feature.",
         body: [
-          "Asking a model to be accurate is hope; validating its output against the source is engineering. Decide early what the model is allowed to control, and design the fallback paths first: the happy path takes care of itself, but trust is won on the other paths.",
+          "The most useful lesson from uxproof wasn't a particular AI pattern. It was deciding early what the model should own, what the product must own, and what the user needs to understand. Once those boundaries were clear, interaction states, fallbacks, accessibility decisions, component contracts and architecture became much easier to reason about.",
+          "For complex AI products, I'd start there every time: define responsibility → design the interaction → build the system → validate the edge states → codify the pattern.",
         ],
       },
     ],
