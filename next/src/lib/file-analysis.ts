@@ -26,6 +26,26 @@ export function fallbackTextSummary(filename: string, text: string): string {
 }
 
 /**
+ * The summary guardrail, pure and unit-tested: every substantial number in
+ * the reply must literally appear in the source text. Small integer counts
+ * (≤ 12) and year-like integers (1900–2100) are exempt — they are structure,
+ * not metrics. Returns false when any other number can't be traced.
+ */
+export function summaryNumbersGrounded(reply: string, text: string): boolean {
+  const source = text.replace(/,/g, '');
+  for (const num of reply.replace(/,/g, '').match(/\d+(?:\.\d+)?/g) ?? []) {
+    const value = parseFloat(num);
+    if (value <= 12 && Number.isInteger(value)) continue;                    // small counts
+    if (value >= 1900 && value <= 2100 && Number.isInteger(value)) continue; // years
+    if (!source.includes(num)) {
+      console.warn('[file-analysis] summary guardrail: number not in source:', num);
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Detailed, grounded AI summary of a document. Cites source pages when the
  * text carries [page N] markers. Returns null on any failure (Ollama down,
  * timeout, guardrail) — callers fall back to fallbackTextSummary.
@@ -73,16 +93,7 @@ export async function aiDocumentSummary(filename: string, text: string): Promise
     // Guardrail: every substantial number in the reply must appear in the
     // source text. Page citations pass because their [page N] markers are
     // part of the text being checked against.
-    const source = text.replace(/,/g, '');
-    for (const num of reply.replace(/,/g, '').match(/\d+(?:\.\d+)?/g) ?? []) {
-      const value = parseFloat(num);
-      if (value <= 12 && Number.isInteger(value)) continue;                    // small counts
-      if (value >= 1900 && value <= 2100 && Number.isInteger(value)) continue; // years
-      if (!source.includes(num)) {
-        console.warn('[file-analysis] summary guardrail: number not in source:', num);
-        return null;
-      }
-    }
+    if (!summaryNumbersGrounded(reply, text)) return null;
     return reply;
   } catch {
     return null;

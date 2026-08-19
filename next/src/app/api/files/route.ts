@@ -31,6 +31,16 @@ import {
   createChatSession,
   appendMessageToSession,
 } from '@/lib/sanity';
+import {
+  type ParsedReport,
+  NUMERIC_FIELDS,
+  SEVERITY_MAP,
+  toReport,
+  parseJsonReports,
+  parseCsvReports,
+  numberAppearsIn,
+  salvageScalarFields,
+} from '@/lib/report-parsing';
 
 const MAX_FILE_BYTES  = 5 * 1024 * 1024;
 const MAX_STORED_TEXT = 30_000;
@@ -63,209 +73,22 @@ async function extractPdfText(file: File): Promise<string> {
 }
 
 // ─── Structured report parsing ────────────────────────────────────────────────
-//
-// A "structured report" is any JSON object / array or CSV row carrying at
-// least quarter + year + susScore. Everything else on the row is carried
-// through when it matches the report schema's fields.
-
-interface ParsedReport {
-  quarter:          string;
-  year:             number;
-  susScore:         number;
-  susChange?:       number;
-  taskSuccessRate?: number;
-  npsScore?:        number;
-  participants?:    number;
-  errorRate?:       number;
-  conversionRate?:  number;
-  client?:          string;
-  product?:         string;
-  platform?:        string;
-  methods?:         string[];
-  kpis?:            unknown[];
-  issues?:          unknown[];
-  insights?:        unknown[];
-}
-
-const NUMERIC_FIELDS = [
-  'susScore', 'susChange', 'taskSuccessRate', 'npsScore',
-  'participants', 'errorRate', 'conversionRate',
-] as const;
-
-function normKey(key: string): string {
-  return key.toLowerCase().replace(/[\s_-]/g, '');
-}
-
-// canonical field ← accepted normalized spellings
-const FIELD_ALIASES: Record<string, string[]> = {
-  quarter:         ['quarter', 'q'],
-  year:            ['year'],
-  susScore:        ['susscore', 'sus'],
-  susChange:       ['suschange', 'susdelta'],
-  taskSuccessRate: ['tasksuccessrate', 'tasksuccess', 'successrate', 'completionrate'],
-  npsScore:        ['npsscore', 'nps'],
-  participants:    ['participants', 'samplesize', 'testers'],
-  errorRate:       ['errorrate', 'errors'],
-  conversionRate:  ['conversionrate', 'conversion'],
-  client:          ['client'],
-  product:         ['product', 'surface'],
-  platform:        ['platform'],
-};
-
-function canonicalize(obj: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  const byNorm = new Map(Object.entries(obj).map(([k, v]) => [normKey(k), v]));
-  for (const [canonical, aliases] of Object.entries(FIELD_ALIASES)) {
-    for (const alias of aliases) {
-      if (byNorm.has(alias)) { out[canonical] = byNorm.get(alias); break; }
-    }
-  }
-  // arrays pass through under their exact names
-  for (const arr of ['methods', 'kpis', 'issues', 'insights']) {
-    if (Array.isArray(obj[arr])) out[arr] = obj[arr];
-  }
-  return out;
-}
-
-function toReport(raw: Record<string, unknown>): ParsedReport | null {
-  const o = canonicalize(raw);
-
-  const quarter = String(o.quarter ?? '').trim().toUpperCase();
-  const year    = parseInt(String(o.year ?? ''), 10);
-  const sus     = parseFloat(String(o.susScore ?? ''));
-  if (!/^Q[1-4]$/.test(quarter) || !(year >= 2000 && year <= 2100) || !Number.isFinite(sus)) {
-    return null;
-  }
-
-  const report: ParsedReport = { quarter, year, susScore: sus };
-  for (const field of NUMERIC_FIELDS) {
-    if (field === 'susScore') continue;
-    const v = parseFloat(String(o[field] ?? ''));
-    if (Number.isFinite(v)) report[field] = v;
-  }
-  for (const field of ['client', 'product', 'platform'] as const) {
-    if (typeof o[field] === 'string' && o[field]) report[field] = o[field] as string;
-  }
-  if (Array.isArray(o.methods)) report.methods = (o.methods as unknown[]).map(String);
-
-  // Typed arrays — keep only well-shaped members, stamp _key for Sanity.
-  const keyed = (arr: unknown[], required: string[]) =>
-    arr
-      .filter((x): x is Record<string, unknown> =>
-        !!x && typeof x === 'object' && required.every(f => typeof (x as Record<string, unknown>)[f] === 'string'))
-      .map((x, i) => ({ _key: `k${i}`, ...x }));
-
-  if (Array.isArray(o.kpis))     report.kpis     = keyed(o.kpis,     ['label', 'value']);
-  if (Array.isArray(o.issues))   report.issues   = keyed(o.issues,   ['title', 'description']);
-  if (Array.isArray(o.insights)) report.insights = keyed(o.insights, ['title', 'summary']);
-
-  return report;
-}
-
-function parseJsonReports(text: string): ParsedReport[] {
-  try {
-    const data = JSON.parse(text);
-    const candidates: unknown[] = Array.isArray(data)
-      ? data
-      : Array.isArray((data as Record<string, unknown>)?.reports)
-        ? (data as Record<string, unknown[]>).reports
-        : [data];
-    return candidates
-      .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
-      .map(toReport)
-      .filter((r): r is ParsedReport => r !== null);
-  } catch {
-    return [];
-  }
-}
-
-/** Minimal CSV split — quoted cells with embedded commas supported. */
-function splitCsvLine(line: string): string[] {
-  const cells: string[] = [];
-  let cur = '', inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
-      else inQuotes = !inQuotes;
-    } else if (ch === ',' && !inQuotes) {
-      cells.push(cur); cur = '';
-    } else cur += ch;
-  }
-  cells.push(cur);
-  return cells.map(c => c.trim());
-}
-
-function parseCsvReports(text: string): ParsedReport[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = splitCsvLine(lines[0]);
-  return lines.slice(1)
-    .map(line => {
-      const cells = splitCsvLine(line);
-      const row: Record<string, unknown> = {};
-      headers.forEach((h, i) => { row[h] = cells[i]; });
-      return toReport(row);
-    })
-    .filter((r): r is ParsedReport => r !== null);
-}
+// (parsers + grounding gate live in lib/report-parsing.ts — pure and
+//  unit-tested; this route owns only the I/O around them)
 
 // ─── Model-based extraction for unstructured documents ───────────────────────
 //
 // PDFs / TXT / Markdown reports carry their metrics in prose. The local
 // model CONVERTS that prose into the structured report shape — it never
 // supplies values: every numeric field is validated to appear literally in
-// the document text, and any that don't are dropped. Missing quarter/year
-// default to the current period (a filing label, not a metric).
-
-function numberAppearsIn(source: string, value: unknown): boolean {
-  const n = parseFloat(String(value));
-  if (!Number.isFinite(n)) return false;
-  const plain = String(n).replace(/\.0$/, '');
-  return source.includes(plain);
-}
+// the document text (numberAppearsIn, lib/report-parsing.ts), and any that
+// don't are dropped. Missing quarter/year default to the current period
+// (a filing label, not a metric).
 
 function currentPeriod(): { quarter: string; year: number } {
   const now = new Date();
   return { quarter: `Q${Math.floor(now.getMonth() / 3) + 1}`, year: now.getFullYear() };
 }
-
-/**
- * When the model's reply is cut off by the num_predict cap, JSON.parse fails
- * even though the scalar metrics are all present — they come first in the
- * requested shape and long issues/insights arrays are what overflow. Recover
- * the scalars from the truncated prefix so the report survives; the arrays
- * are dropped for that upload.
- */
-function salvageScalarFields(content: string): Record<string, unknown> | null {
-  const out: Record<string, unknown> = {};
-  const str = (k: string) => content.match(new RegExp(`"${k}"\\s*:\\s*"([^"]+)"`))?.[1];
-  const num = (k: string) => {
-    const m = content.match(new RegExp(`"${k}"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)`));
-    return m ? parseFloat(m[1]) : undefined;
-  };
-  for (const field of NUMERIC_FIELDS) {
-    const v = num(field);
-    if (v !== undefined) out[field] = v;
-  }
-  const quarter = str('quarter');
-  if (quarter) out.quarter = quarter;
-  const year = num('year');
-  if (year !== undefined) out.year = year;
-  for (const field of ['client', 'product', 'platform']) {
-    const v = str(field);
-    if (v) out[field] = v;
-  }
-  return out.susScore != null ? out : null;
-}
-
-// Models drift off the requested low|medium|high scale ("critical", "major");
-// normalize instead of losing the issue.
-const SEVERITY_MAP: Record<string, string> = {
-  critical: 'high', blocker: 'high', major: 'high', high: 'high',
-  moderate: 'medium', medium: 'medium',
-  minor: 'low', trivial: 'low', low: 'low',
-};
 
 async function extractReportViaModel(filename: string, text: string): Promise<ParsedReport | null> {
   try {
@@ -391,7 +214,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const form         = await request.formData();
+    // A body that isn't multipart form-data is a malformed request, not a
+    // server fault — answer 400 rather than letting the throw become a 500.
+    const form = await request.formData().catch(() => null);
+    if (!form) {
+      return NextResponse.json(
+        { error: 'Expected a multipart form upload.' },
+        { status: 400 },
+      );
+    }
     const file         = form.get('file');
     const sessionId    = String(form.get('sessionId') ?? '').trim() || undefined;
     const isNewSession = String(form.get('isNewSession') ?? '') === 'true';
