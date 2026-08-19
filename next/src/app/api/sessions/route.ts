@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@sanity/client';
+import { getCurrentUser } from '@/lib/auth';
 
 const client = createClient({
   projectId:  process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || '',
@@ -10,9 +11,14 @@ const client = createClient({
 });
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ sessions: [], error: 'Not signed in' }, { status: 401 });
+  }
+
   try {
     const rows = await client.fetch(
-      `*[_type == "chatSession"] | order(createdAt desc)[0..49]{
+      `*[_type == "chatSession" && user._ref == $userId] | order(createdAt desc)[0..49]{
         "sessionId":    sessionId,
         "id":           sessionId,
         "title":        coalesce(quarter, sessionId),
@@ -20,7 +26,8 @@ export async function GET() {
         createdAt,
         "preview":      messages[-1].content,
         "messageCount": count(messages)
-      }`
+      }`,
+      { userId: user.id }
     );
     return NextResponse.json({ sessions: (rows || []).filter((r: any) => r.sessionId) });
   } catch (e) {

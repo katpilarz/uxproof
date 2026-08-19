@@ -5,6 +5,13 @@ export default {
   fields: [
     { name: 'reportId', title: 'Report ID', type: 'string' },
     {
+      name: 'user',
+      title: 'Owner',
+      type: 'reference',
+      to: [{ type: 'user' }],
+      description: 'Reports are per-user: created from that user\'s uploaded files.',
+    },
+    {
       name: 'quarter',
       title: 'Quarter',
       type: 'string',

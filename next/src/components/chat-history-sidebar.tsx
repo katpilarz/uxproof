@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useMemo } from 'react';
-import { X, MessageSquare, Plus, Loader2 } from 'lucide-react';
+import { X, MessageSquare, Plus, Loader2, Trash2 } from 'lucide-react';
 import { Button }     from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn }         from '@/lib/utils';
@@ -33,6 +33,7 @@ import {
   useLoadSessions,
   useSelectSession,
   useNewSession,
+  useDeleteSession,
 } from '@/store';
 
 type SessionRow = ReturnType<typeof useSessions>[number];
@@ -55,6 +56,7 @@ export function ChatHistorySidebar() {
   const loadSessions  = useLoadSessions();
   const selectSession = useSelectSession();
   const newSession    = useNewSession();
+  const deleteSession = useDeleteSession();
 
   // Load sessions whenever sidebar opens
   useEffect(() => {
@@ -190,37 +192,59 @@ export function ChatHistorySidebar() {
                     const when     = formatDistanceToNowStrict(new Date(s.createdAt), { addSuffix: true });
 
                     return (
-                      <button
-                        key={s.sessionId}
-                        onClick={() => handleSelect(s.sessionId)}
-                        aria-current={isActive ? 'true' : undefined}
-                        className={cn(
-                          'w-full max-w-full text-left px-2.5 py-2 rounded-lg border transition-colors duration-150 group overflow-hidden',
-                          isActive
-                            ? 'bg-violet-500/10 border-violet-500/40'
-                            : 'bg-transparent border-transparent hover:bg-muted/60',
-                        )}
-                      >
-                        {/* Primary line: what the conversation was about */}
-                        <p
+                      // Wrapper div, not nested <button>s — the delete
+                      // action is an absolutely-positioned sibling of the
+                      // row button so the markup stays valid.
+                      <div key={s.sessionId} className="relative group">
+                        <button
+                          onClick={() => handleSelect(s.sessionId)}
+                          aria-current={isActive ? 'true' : undefined}
                           className={cn(
-                            'text-xs truncate leading-snug',
+                            'w-full max-w-full text-left pl-2.5 pr-8 py-2 rounded-lg border transition-colors duration-150 overflow-hidden',
                             isActive
-                              ? 'text-violet-700 dark:text-violet-300 font-medium'
-                              : 'text-foreground',
+                              ? 'bg-violet-500/10 border-violet-500/40'
+                              : 'bg-transparent border-transparent hover:bg-muted/60',
                           )}
                         >
-                          {title}
-                        </p>
-                        {/* Metadata line: quarter tag + relative time */}
-                        <p className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground/60 truncate">
-                          {s.quarter && (
-                            <span className="font-mono uppercase tracking-wide">{s.quarter}</span>
+                          {/* Primary line: what the conversation was about */}
+                          <p
+                            className={cn(
+                              'text-xs truncate leading-snug',
+                              isActive
+                                ? 'text-violet-700 dark:text-violet-300 font-medium'
+                                : 'text-foreground',
+                            )}
+                          >
+                            {title}
+                          </p>
+                          {/* Metadata line: quarter tag + relative time */}
+                          <p className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground/60 truncate">
+                            {s.quarter && (
+                              <span className="font-mono uppercase tracking-wide">{s.quarter}</span>
+                            )}
+                            {s.quarter && <span aria-hidden="true">·</span>}
+                            <span>{when}</span>
+                          </p>
+                        </button>
+
+                        {/* Delete conversation — removes it from Sanity too;
+                            confirmed via toast (session slice). */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSession(s.sessionId);
+                          }}
+                          aria-label={`Delete conversation “${title}”`}
+                          title="Delete conversation"
+                          className={cn(
+                            'absolute right-1.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md',
+                            'text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-colors',
+                            'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                           )}
-                          {s.quarter && <span aria-hidden="true">·</span>}
-                          <span>{when}</span>
-                        </p>
-                      </button>
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>

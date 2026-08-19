@@ -40,7 +40,26 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   monochrome (black / white / gray only, NO accent colours, NO logos or company
   branding anywhere in app or decks; Space Grotesk + DM Sans + DM Mono, hairline
   rules). Never hardcode template values elsewhere; never reintroduce logos, red,
-  or accent colours.
+  or accent colours. ONE deliberate exception: the cover photograph
+  (`ASSETS.COVER_IMAGE` in `next/src/lib/ppt-assets.ts`) stays in full colour —
+  do not convert it to grayscale.
+- **Lightweight per-user auth.** Signing in is claiming an email identity (no
+  password — internal tool): `/api/auth/*` + `next/src/lib/auth.ts` set an
+  HMAC-signed httpOnly cookie, users live in Sanity as `user` documents, and
+  chat sessions / presentations carry an owner reference. Every data API route
+  resolves the user server-side via `getCurrentUser()` and scopes queries to it.
+  Don't add cloud auth providers; keep it cookie + Sanity only.
+- **All research data is user-uploaded — there is no global dataset.** Users add
+  files via the chat **+** button (`/api/files`): CSV/JSON rows carrying
+  `quarter` + `year` + `susScore` are parsed into user-owned `report` documents
+  (numbers come from the parse, never the model); TXT/Markdown files are stored
+  as `userFile` reference context with an AI-or-fallback summary. All report
+  queries (`next/src/lib/services/report-query.ts`) filter on `user._ref`; a
+  user with no data is asked to upload, not shown someone else's numbers.
+  `npm run purge:global-data` (from `next/`) removes unowned seed docs. Known
+  caveat: the FastAPI agent-service still queries reports globally for deep
+  analysis and slide plans — acceptable single-machine, scope it before any
+  multi-user deployment.
 - **Local-only inference is a product feature.** Client research data never leaves the
   machine. Do not introduce cloud LLM calls or send research data to external services.
 - **No orchestration frameworks.** The pipeline is deliberately hand-rolled (AutoGen
@@ -52,7 +71,9 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   uvicorn main:app --port 8001` (venv `.venv`, `requirements.txt`). Studio:
   `cd sanity-studio && npm run dev` (port 3333).
 - Re-seed demo data: `npx sanity dataset import seed-reports.ndjson production
-  --replace` from `sanity-studio/`.
+  --replace` from `sanity-studio/`. Note: seeded reports have no owner, so the
+  app (per-user, upload-grounded) ignores them — they are only useful for
+  inspecting the schema in Studio or for the agent-service pipeline.
 - Sanity project ID (`ygdze74e`) is public and committed as a fallback; API tokens are
   env-only.
 

@@ -9,14 +9,18 @@ import { immer } from 'zustand/middleware/immer';
 
 import { createChatSlice, ChatSlice } from './slices/chat-slice';
 import { createSessionSlice, SessionSlice } from './slices/session-slice';
+import { createAuthSlice, AuthSlice } from './slices/auth-slice';
+import { createToastSlice, ToastSlice } from './slices/toast-slice';
 
-export type AppStore = ChatSlice & SessionSlice;
+export type AppStore = ChatSlice & SessionSlice & AuthSlice & ToastSlice;
 
 export const useStore = create<AppStore>()(
   devtools(
     immer((...a) => ({
       ...createChatSlice(...a),
       ...createSessionSlice(...a),
+      ...createAuthSlice(...a),
+      ...createToastSlice(...a),
     })),
     { name: 'UxproofStore' }
   )
@@ -35,6 +39,7 @@ export const useStreamSteps      = () => useStore(s => s.streamSteps);
 // ── Chat actions ───────────────────────────────────────────────────────────────
 
 export const useSendMessage          = () => useStore(s => s.sendMessage);
+export const useUploadFile           = () => useStore(s => s.uploadFile);
 export const useResetChat            = () => useStore(s => s.resetChat);
 export const useSetMessages          = () => useStore(s => s.setMessages);
 export const useSetView              = () => useStore(s => s.setView);
@@ -55,12 +60,28 @@ export const useSettingsOpen    = () => useStore(s => s.settingsOpen);
 
 // ── Session actions ────────────────────────────────────────────────────────────
 
+// ── Auth ───────────────────────────────────────────────────────────────────────
+
+export const useAuthUser     = () => useStore(s => s.user);
+export const useAuthLoading  = () => useStore(s => s.authLoading);
+export const useLoginPending = () => useStore(s => s.loginPending);
+export const useCheckAuth    = () => useStore(s => s.checkAuth);
+export const useLogin        = () => useStore(s => s.login);
+export const useLogout       = () => useStore(s => s.logout);
+
+// ── Toasts ─────────────────────────────────────────────────────────────────────
+
+export const useToasts       = () => useStore(s => s.toasts);
+export const useShowToast    = () => useStore(s => s.showToast);
+export const useDismissToast = () => useStore(s => s.dismissToast);
+
 export const useNewSession    = () => useStore(s => s.newSession);
 // useInitSession: called once on app mount — seeds session + loads sidebar history
 // Does NOT push to '/' (we're already there at boot)
 export const useInitSession   = () => useStore(s => s.initSession);
 export const useSelectSession = () => useStore(s => s.selectSession);
 export const useLoadSessions  = () => useStore(s => s.loadSessions);
+export const useDeleteSession = () => useStore(s => s.deleteSession);
 export const useOpenHistory   = () => useStore(s => s.openHistory);
 export const useCloseHistory  = () => useStore(s => s.closeHistory);
 export const useOpenSettings  = () => useStore(s => s.openSettings);

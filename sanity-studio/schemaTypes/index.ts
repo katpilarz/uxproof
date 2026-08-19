@@ -4,6 +4,8 @@ import chatSession from './chatSession';
 import chatMessage from './chatMessage';
 import executiveIntelligence from './executiveIntelligence';
 import slidePlan from './slidePlan';
+import user from './user';
+import userFile from './userFile';
 
 export const schemaTypes = [
   report,
@@ -11,5 +13,7 @@ export const schemaTypes = [
   chatSession,
   chatMessage,
   executiveIntelligence,
-  slidePlan
+  slidePlan,
+  user,
+  userFile
 ];
