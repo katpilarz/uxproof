@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 820" font-family="ui-monospace, 'DM Mono', 'SF Mono', Menlo, Consolas, monospace" role="img" aria-label="The grounding gate: how a prose document becomes a report, or does not">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1A1A1A"/>
+    </marker>
+  </defs>
+
+  <rect width="720" height="820" fill="#FBFBF9"/>
+
+  <!-- header -->
+  <text x="40" y="42" font-size="13" letter-spacing="2.5" fill="#1A1A1A">THE GROUNDING GATE</text>
+  <text x="680" y="42" font-size="10" letter-spacing="2" fill="#6B6B66" text-anchor="end">PROSE → REPORT</text>
+  <line x1="40" y1="58" x2="680" y2="58" stroke="#D9D9D3" stroke-width="1"/>
+
+  <!-- uploaded document -->
+  <rect x="140" y="86" width="440" height="74" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="360" y="118" font-size="11.5" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">UPLOADED DOCUMENT</text>
+  <text x="360" y="140" font-size="9.5" fill="#6B6B66" text-anchor="middle">pdf · txt · md — text extracted locally</text>
+
+  <line x1="360" y1="160" x2="360" y2="194" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+
+  <!-- model conversion -->
+  <rect x="140" y="196" width="440" height="74" fill="none" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="360" y="228" font-size="11.5" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">MODEL CONVERSION</text>
+  <text x="360" y="250" font-size="9.5" fill="#6B6B66" text-anchor="middle">temperature 0 · JSON mode — proposes the fields</text>
+
+  <line x1="360" y1="270" x2="360" y2="302" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+
+  <!-- gate 1 -->
+  <rect x="100" y="304" width="520" height="64" fill="#1A1A1A"/>
+  <text x="360" y="330" font-size="10.5" letter-spacing="1.5" fill="#FBFBF9" text-anchor="middle">GATE — DOES EACH NUMBER APPEAR</text>
+  <text x="360" y="350" font-size="10.5" letter-spacing="1.5" fill="#FBFBF9" text-anchor="middle">LITERALLY IN THE SOURCE TEXT?</text>
+
+  <line x1="204" y1="368" x2="204" y2="398" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="516" y1="368" x2="516" y2="398" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+
+  <!-- gate 1 branches -->
+  <rect x="64" y="400" width="280" height="66" fill="none" stroke="#8A8A84" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="204" y="428" font-size="10.5" letter-spacing="1" fill="#6B6B66" text-anchor="middle">NO — FIELD DROPPED</text>
+  <text x="204" y="448" font-size="9" fill="#6B6B66" text-anchor="middle">never repaired, never shown</text>
+
+  <rect x="376" y="400" width="280" height="66" fill="#FBFBF9" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="516" y="428" font-size="10.5" letter-spacing="1" fill="#1A1A1A" text-anchor="middle">YES — FIELD KEPT</text>
+  <text x="516" y="448" font-size="9" fill="#6B6B66" text-anchor="middle">grounded in the document</text>
+
+  <line x1="516" y1="466" x2="516" y2="496" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+
+  <!-- gate 2 -->
+  <rect x="100" y="498" width="520" height="64" fill="#1A1A1A"/>
+  <text x="360" y="524" font-size="10.5" letter-spacing="1.5" fill="#FBFBF9" text-anchor="middle">GATE — IS THE SUS SCORE ITSELF</text>
+  <text x="360" y="544" font-size="10.5" letter-spacing="1.5" fill="#FBFBF9" text-anchor="middle">GROUNDED?</text>
+
+  <line x1="204" y1="562" x2="204" y2="592" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="516" y1="562" x2="516" y2="592" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+
+  <!-- gate 2 branches -->
+  <rect x="64" y="594" width="280" height="90" fill="none" stroke="#8A8A84" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="204" y="624" font-size="10.5" letter-spacing="1" fill="#6B6B66" text-anchor="middle">NO — NO REPORT AT ALL</text>
+  <text x="204" y="646" font-size="9" fill="#6B6B66" text-anchor="middle">file kept as reference context —</text>
+  <text x="204" y="662" font-size="9" fill="#6B6B66" text-anchor="middle">nothing is invented</text>
+
+  <rect x="376" y="594" width="280" height="90" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1.25"/>
+  <text x="516" y="624" font-size="10.5" letter-spacing="1" fill="#1A1A1A" text-anchor="middle">REPORT PERSISTED</text>
+  <text x="516" y="646" font-size="9" fill="#6B6B66" text-anchor="middle">user-owned · deterministic id —</text>
+  <text x="516" y="662" font-size="9" fill="#6B6B66" text-anchor="middle">re-uploads replace, never duplicate</text>
+
+  <!-- footer -->
+  <line x1="40" y1="728" x2="680" y2="728" stroke="#D9D9D3" stroke-width="1"/>
+  <text x="360" y="764" font-size="11" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">A NUMBER THAT CANNOT BE TRACED IS NEVER SHOWN.</text>
+</svg>

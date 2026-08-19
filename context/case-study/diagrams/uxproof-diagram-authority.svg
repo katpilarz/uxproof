@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="ui-monospace, 'DM Mono', 'SF Mono', Menlo, Consolas, monospace" role="img" aria-label="Division of authority: what the model may own and what code must own">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1A1A1A"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="640" fill="#FBFBF9"/>
+
+  <!-- header -->
+  <text x="48" y="46" font-size="14" letter-spacing="2.5" fill="#1A1A1A">WHERE THE MODEL ENDS — DIVISION OF AUTHORITY</text>
+  <text x="1152" y="46" font-size="10.5" letter-spacing="2" fill="#6B6B66" text-anchor="end">THE FIRST DESIGN DECISION</text>
+  <line x1="48" y1="62" x2="1152" y2="62" stroke="#D9D9D3" stroke-width="1"/>
+
+  <text x="600" y="92" font-size="10.5" letter-spacing="1.5" fill="#6B6B66" text-anchor="middle">WHAT PASSES THE GATE: SELECTION + NARRATION — NEVER A NUMBER</text>
+
+  <!-- through-arrow drawn behind the gate -->
+  <line x1="430" y1="300" x2="768" y2="300" stroke="#1A1A1A" stroke-width="1.25" marker-end="url(#arw)"/>
+
+  <!-- left panel: the model -->
+  <rect x="60" y="112" width="430" height="376" fill="#FBFBF9" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="6 5"/>
+  <text x="88" y="150" font-size="12.5" letter-spacing="2" fill="#1A1A1A">THE MODEL — ENHANCEMENT</text>
+  <line x1="88" y1="166" x2="462" y2="166" stroke="#D9D9D3" stroke-width="1"/>
+
+  <rect x="88" y="196" width="6" height="6" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="108" y="204" font-size="11.5" fill="#1A1A1A">selects which findings matter</text>
+  <rect x="88" y="240" width="6" height="6" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="108" y="248" font-size="11.5" fill="#1A1A1A">narrates and rephrases answers</text>
+  <rect x="88" y="284" width="6" height="6" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="108" y="292" font-size="11.5" fill="#1A1A1A">converts prose to the report shape</text>
+  <rect x="88" y="328" width="6" height="6" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="108" y="336" font-size="11.5" fill="#1A1A1A">summarises uploaded documents</text>
+
+  <line x1="88" y1="424" x2="462" y2="424" stroke="#D9D9D3" stroke-width="1"/>
+  <text x="88" y="452" font-size="10.5" fill="#6B6B66">may be slow, wrong, or offline — by design</text>
+
+  <!-- gate -->
+  <rect x="540" y="112" width="140" height="376" fill="#1A1A1A"/>
+  <text x="610" y="156" font-size="11.5" letter-spacing="2.5" fill="#FBFBF9" text-anchor="middle">VALIDATION</text>
+  <text x="610" y="176" font-size="11.5" letter-spacing="2.5" fill="#FBFBF9" text-anchor="middle">GATE</text>
+  <line x1="566" y1="196" x2="654" y2="196" stroke="#55554F" stroke-width="1"/>
+  <text x="610" y="232" font-size="9.5" fill="#DADAD5" text-anchor="middle">typed contracts</text>
+  <text x="610" y="266" font-size="9.5" fill="#DADAD5" text-anchor="middle">literal-number check</text>
+  <text x="610" y="342" font-size="9.5" fill="#DADAD5" text-anchor="middle">discard on failure —</text>
+  <text x="610" y="358" font-size="9.5" fill="#DADAD5" text-anchor="middle">never repair</text>
+
+  <!-- right panel: the code -->
+  <rect x="730" y="112" width="410" height="376" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1.5"/>
+  <text x="758" y="150" font-size="12.5" letter-spacing="2" fill="#1A1A1A">THE CODE — OWNERSHIP</text>
+  <line x1="758" y1="166" x2="1112" y2="166" stroke="#CFCFC8" stroke-width="1"/>
+
+  <rect x="758" y="196" width="6" height="6" fill="#1A1A1A"/>
+  <text x="778" y="204" font-size="11.5" fill="#1A1A1A">every number — read from the store</text>
+  <rect x="758" y="240" width="6" height="6" fill="#1A1A1A"/>
+  <text x="778" y="248" font-size="11.5" fill="#1A1A1A">the fixed eight-slide structure</text>
+  <rect x="758" y="284" width="6" height="6" fill="#1A1A1A"/>
+  <text x="778" y="292" font-size="11.5" fill="#1A1A1A">styling — one branding module</text>
+  <rect x="758" y="328" width="6" height="6" fill="#1A1A1A"/>
+  <text x="778" y="336" font-size="11.5" fill="#1A1A1A">a deterministic floor for every step</text>
+
+  <line x1="758" y1="424" x2="1112" y2="424" stroke="#CFCFC8" stroke-width="1"/>
+  <text x="758" y="452" font-size="10.5" fill="#1A1A1A">works with the model switched off</text>
+
+  <!-- bottom statements -->
+  <text x="600" y="556" font-size="12" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">AN OUTPUT THAT FAILS THE GATE IS DISCARDED, NOT REPAIRED.</text>
+  <text x="600" y="584" font-size="10" letter-spacing="0.5" fill="#6B6B66" text-anchor="middle">every guardrail, fallback and edge state in the product is this boundary applied to another surface</text>
+</svg>

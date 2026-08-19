@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 760" font-family="ui-monospace, 'DM Mono', 'SF Mono', Menlo, Consolas, monospace" role="img" aria-label="The fallback ladder: what each model step degrades to when the model is down">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1A1A1A"/>
+    </marker>
+  </defs>
+
+  <rect width="720" height="760" fill="#FBFBF9"/>
+
+  <!-- header -->
+  <text x="40" y="42" font-size="13" letter-spacing="2.5" fill="#1A1A1A">EVERY MODEL STEP HAS A FLOOR</text>
+  <text x="680" y="42" font-size="10" letter-spacing="2" fill="#6B6B66" text-anchor="end">ENHANCEMENT, NOT DEPENDENCY</text>
+  <line x1="40" y1="58" x2="680" y2="58" stroke="#D9D9D3" stroke-width="1"/>
+
+  <!-- column headers -->
+  <text x="190" y="96" font-size="10" letter-spacing="1.5" fill="#6B6B66" text-anchor="middle">WITH THE MODEL</text>
+  <text x="530" y="96" font-size="10" letter-spacing="1.5" fill="#6B6B66" text-anchor="middle">THE DETERMINISTIC FLOOR</text>
+
+  <!-- row 1 -->
+  <rect x="48" y="118" width="284" height="76" fill="none" stroke="#4A4A45" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="190" y="150" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">CONVERSATIONAL ANSWER</text>
+  <text x="190" y="172" font-size="9" fill="#6B6B66" text-anchor="middle">rewritten to address the question</text>
+  <line x1="340" y1="156" x2="380" y2="156" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <rect x="388" y="118" width="284" height="76" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="530" y="150" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">TEMPLATED ANSWER</text>
+  <text x="530" y="172" font-size="9" fill="#6B6B66" text-anchor="middle">built from stored report data</text>
+
+  <!-- row 2 -->
+  <rect x="48" y="222" width="284" height="76" fill="none" stroke="#4A4A45" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="190" y="254" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">AI DOCUMENT SUMMARY</text>
+  <text x="190" y="276" font-size="9" fill="#6B6B66" text-anchor="middle">page-cited · number-checked</text>
+  <line x1="340" y1="260" x2="380" y2="260" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <rect x="388" y="222" width="284" height="76" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="530" y="254" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">STRUCTURED EXCERPT</text>
+  <text x="530" y="276" font-size="9" fill="#6B6B66" text-anchor="middle">word count + key passages</text>
+
+  <!-- row 3 -->
+  <rect x="48" y="326" width="284" height="76" fill="none" stroke="#4A4A45" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="190" y="358" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">PROSE → REPORT CONVERSION</text>
+  <text x="190" y="380" font-size="9" fill="#6B6B66" text-anchor="middle">literal-value guardrail</text>
+  <line x1="340" y1="364" x2="380" y2="364" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <rect x="388" y="326" width="284" height="76" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="530" y="358" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">FILE AS REFERENCE</text>
+  <text x="530" y="380" font-size="9" fill="#6B6B66" text-anchor="middle">no report is invented</text>
+
+  <!-- row 4 -->
+  <rect x="48" y="430" width="284" height="76" fill="none" stroke="#4A4A45" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="190" y="462" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">INTELLIGENCE EXTRACTION</text>
+  <text x="190" y="484" font-size="9" fill="#6B6B66" text-anchor="middle">validated against a typed schema</text>
+  <line x1="340" y1="468" x2="380" y2="468" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <rect x="388" y="430" width="284" height="76" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="530" y="462" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">RULE-BUILT INTELLIGENCE</text>
+  <text x="530" y="484" font-size="9" fill="#6B6B66" text-anchor="middle">synthesised from the context payload</text>
+
+  <!-- row 5 -->
+  <rect x="48" y="534" width="284" height="76" fill="none" stroke="#4A4A45" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="190" y="566" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">SLIDE PLANNING</text>
+  <text x="190" y="588" font-size="9" fill="#6B6B66" text-anchor="middle">selects + narrates the content</text>
+  <line x1="340" y1="572" x2="380" y2="572" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <rect x="388" y="534" width="284" height="76" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="530" y="566" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">RULE-BUILT 8-SLIDE PLAN</text>
+  <text x="530" y="588" font-size="9" fill="#6B6B66" text-anchor="middle">a complete deck, no model required</text>
+
+  <!-- footer -->
+  <line x1="40" y1="656" x2="680" y2="656" stroke="#D9D9D3" stroke-width="1"/>
+  <text x="360" y="692" font-size="11" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">WITH THE MODEL COMPLETELY DOWN, DECKS STILL GENERATE.</text>
+  <text x="360" y="716" font-size="9.5" fill="#6B6B66" text-anchor="middle">the model raises quality; it never gates delivery</text>
+</svg>

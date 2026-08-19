@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780" font-family="ui-monospace, 'DM Mono', 'SF Mono', Menlo, Consolas, monospace" role="img" aria-label="uxproof system architecture diagram">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1A1A1A"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="780" fill="#FBFBF9"/>
+
+  <!-- header -->
+  <text x="48" y="46" font-size="14" letter-spacing="2.5" fill="#1A1A1A">UXPROOF — SYSTEM ARCHITECTURE</text>
+  <text x="1152" y="46" font-size="10.5" letter-spacing="2" fill="#6B6B66" text-anchor="end">LOCAL-ONLY INFERENCE</text>
+  <line x1="48" y1="62" x2="1152" y2="62" stroke="#D9D9D3" stroke-width="1"/>
+
+  <!-- machine boundary -->
+  <rect x="48" y="86" width="1104" height="616" fill="none" stroke="#B9B9B2" stroke-width="1" stroke-dasharray="6 6"/>
+
+  <!-- browser -->
+  <rect x="330" y="112" width="540" height="84" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="600" y="148" font-size="12.5" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">BROWSER — REACT 19</text>
+  <text x="600" y="172" font-size="10.5" fill="#6B6B66" text-anchor="middle">server-rendered pages · client components · one Zustand store</text>
+
+  <!-- browser -> next -->
+  <line x1="600" y1="196" x2="600" y2="238" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <text x="586" y="222" font-size="9.5" fill="#6B6B66" text-anchor="end">fetch · cookie auth</text>
+  <text x="614" y="222" font-size="9.5" fill="#6B6B66">SSE</text>
+
+  <!-- next.js app -->
+  <rect x="150" y="240" width="900" height="168" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.25"/>
+  <text x="600" y="270" font-size="12.5" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">NEXT.JS APP — CHAT, GROUNDING, DECK RENDERING</text>
+
+  <rect x="172" y="288" width="272" height="96" fill="#FBFBF9" stroke="#D9D9D3" stroke-width="1"/>
+  <text x="308" y="318" font-size="10.5" letter-spacing="1" fill="#1A1A1A" text-anchor="middle">INTENT ROUTING</text>
+  <text x="308" y="340" font-size="9.5" fill="#6B6B66" text-anchor="middle">casual · data · deep ·</text>
+  <text x="308" y="356" font-size="9.5" fill="#6B6B66" text-anchor="middle">presentation · summary</text>
+
+  <rect x="464" y="288" width="272" height="96" fill="#FBFBF9" stroke="#D9D9D3" stroke-width="1"/>
+  <text x="600" y="318" font-size="10.5" letter-spacing="1" fill="#1A1A1A" text-anchor="middle">UPLOADS + GROUNDING GATE</text>
+  <text x="600" y="340" font-size="9.5" fill="#6B6B66" text-anchor="middle">deterministic parse ·</text>
+  <text x="600" y="356" font-size="9.5" fill="#6B6B66" text-anchor="middle">literal-number check</text>
+
+  <rect x="756" y="288" width="272" height="96" fill="#FBFBF9" stroke="#D9D9D3" stroke-width="1"/>
+  <text x="892" y="318" font-size="10.5" letter-spacing="1" fill="#1A1A1A" text-anchor="middle">DECK RENDERER</text>
+  <text x="892" y="340" font-size="9.5" fill="#6B6B66" text-anchor="middle">fixed 8 slides ·</text>
+  <text x="892" y="356" font-size="9.5" fill="#6B6B66" text-anchor="middle">one monochrome brand module</text>
+
+  <!-- next -> sanity -->
+  <line x1="265" y1="408" x2="265" y2="486" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <text x="278" y="450" font-size="9.5" fill="#6B6B66">GROQ — user-scoped</text>
+
+  <!-- next -> fastapi -->
+  <line x1="600" y1="408" x2="600" y2="486" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <text x="613" y="450" font-size="9.5" fill="#6B6B66">typed pipeline trigger</text>
+
+  <!-- next -> ollama -->
+  <line x1="960" y1="408" x2="960" y2="486" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <text x="973" y="450" font-size="9.5" fill="#6B6B66">answers · summaries</text>
+
+  <!-- sanity -->
+  <rect x="110" y="488" width="310" height="140" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="265" y="522" font-size="12.5" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">SANITY CMS</text>
+  <text x="265" y="548" font-size="10" fill="#6B6B66" text-anchor="middle">reports · files · sessions ·</text>
+  <text x="265" y="564" font-size="10" fill="#6B6B66" text-anchor="middle">presentations · slide plans</text>
+  <text x="265" y="596" font-size="9.5" fill="#6B6B66" text-anchor="middle">the single source of every number</text>
+
+  <!-- fastapi -->
+  <rect x="470" y="488" width="350" height="140" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.25"/>
+  <text x="645" y="522" font-size="12.5" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">FASTAPI AGENT PIPELINE</text>
+  <text x="645" y="548" font-size="10" fill="#6B6B66" text-anchor="middle">context → extraction → planning</text>
+  <text x="645" y="564" font-size="10" fill="#6B6B66" text-anchor="middle">hand-rolled — no frameworks</text>
+  <text x="645" y="596" font-size="9.5" fill="#6B6B66" text-anchor="middle">Pydantic contracts between agents</text>
+
+  <!-- ollama -->
+  <rect x="880" y="488" width="250" height="140" fill="none" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="1005" y="522" font-size="12.5" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">OLLAMA</text>
+  <text x="1005" y="548" font-size="10" fill="#6B6B66" text-anchor="middle">qwen2.5:14b · localhost</text>
+  <text x="1005" y="564" font-size="10" fill="#6B6B66" text-anchor="middle">enhancement,</text>
+  <text x="1005" y="580" font-size="10" fill="#6B6B66" text-anchor="middle">never dependency</text>
+
+  <!-- fastapi <-> sanity, fastapi -> ollama -->
+  <line x1="470" y1="558" x2="422" y2="558" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="820" y1="558" x2="878" y2="558" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+
+  <!-- boundary label -->
+  <text x="600" y="676" font-size="10.5" letter-spacing="1.5" fill="#6B6B66" text-anchor="middle">ONE MACHINE — RESEARCH DATA NEVER LEAVES THIS FRAME</text>
+
+  <!-- footer -->
+  <line x1="48" y1="726" x2="1152" y2="726" stroke="#D9D9D3" stroke-width="1"/>
+  <text x="48" y="754" font-size="10" letter-spacing="1" fill="#6B6B66">DASHED = MAY BE ABSENT — THE PRODUCT STILL WORKS</text>
+  <text x="1152" y="754" font-size="10" letter-spacing="1" fill="#6B6B66" text-anchor="end">SOLID = DETERMINISTIC, ALWAYS ON</text>
+</svg>

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" font-family="ui-monospace, 'DM Mono', 'SF Mono', Menlo, Consolas, monospace" role="img" aria-label="One contract, three languages: the content-block shape shared by the schema, the app, and the pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1A1A1A"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="620" fill="#FBFBF9"/>
+
+  <!-- header -->
+  <text x="48" y="46" font-size="14" letter-spacing="2.5" fill="#1A1A1A">ONE CONTRACT, THREE LANGUAGES</text>
+  <text x="1152" y="46" font-size="10.5" letter-spacing="2" fill="#6B6B66" text-anchor="end">TYPED SEAMS</text>
+  <line x1="48" y1="62" x2="1152" y2="62" stroke="#D9D9D3" stroke-width="1"/>
+
+  <!-- the contract -->
+  <rect x="380" y="100" width="440" height="112" fill="#1A1A1A"/>
+  <text x="600" y="140" font-size="12.5" letter-spacing="2" fill="#FBFBF9" text-anchor="middle">THE CONTENT-BLOCK CONTRACT</text>
+  <text x="600" y="166" font-size="10" fill="#DADAD5" text-anchor="middle">kpi · chart · issue · priority · subtitle</text>
+  <text x="600" y="184" font-size="10" fill="#DADAD5" text-anchor="middle">one shape for everything a slide may hold</text>
+
+  <!-- connectors -->
+  <line x1="600" y1="212" x2="228" y2="328" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="600" y1="212" x2="600" y2="328" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="600" y1="212" x2="972" y2="328" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
+  <text x="614" y="276" font-size="9.5" fill="#6B6B66">kept in sync — by rule, checked in review</text>
+
+  <!-- sanity -->
+  <rect x="60" y="330" width="330" height="130" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="225" y="366" font-size="12" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">SANITY SCHEMA</text>
+  <line x1="88" y1="382" x2="362" y2="382" stroke="#CFCFC8" stroke-width="1"/>
+  <text x="225" y="410" font-size="10" fill="#6B6B66" text-anchor="middle">the content model — what can</text>
+  <text x="225" y="428" font-size="10" fill="#6B6B66" text-anchor="middle">be written to the store</text>
+
+  <!-- typescript -->
+  <rect x="435" y="330" width="330" height="130" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="600" y="366" font-size="12" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">TYPESCRIPT + GROQ</text>
+  <line x1="463" y1="382" x2="737" y2="382" stroke="#CFCFC8" stroke-width="1"/>
+  <text x="600" y="410" font-size="10" fill="#6B6B66" text-anchor="middle">the app + deck renderer — what</text>
+  <text x="600" y="428" font-size="10" fill="#6B6B66" text-anchor="middle">is read, projected, and drawn</text>
+
+  <!-- pydantic -->
+  <rect x="810" y="330" width="330" height="130" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
+  <text x="975" y="366" font-size="12" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">PYDANTIC MODELS</text>
+  <line x1="838" y1="382" x2="1112" y2="382" stroke="#CFCFC8" stroke-width="1"/>
+  <text x="975" y="410" font-size="10" fill="#6B6B66" text-anchor="middle">the agent pipeline — what agents</text>
+  <text x="975" y="428" font-size="10" fill="#6B6B66" text-anchor="middle">may hand to each other</text>
+
+  <!-- footer statements -->
+  <line x1="48" y1="510" x2="1152" y2="510" stroke="#D9D9D3" stroke-width="1"/>
+  <text x="600" y="546" font-size="11.5" letter-spacing="1.5" fill="#1A1A1A" text-anchor="middle">A NEW SLIDE ELEMENT IS DEFINED ONCE — AND UNDERSTOOD EVERYWHERE.</text>
+  <text x="600" y="574" font-size="10" fill="#6B6B66" text-anchor="middle">malformed model output fails loudly at a validation boundary — never silently in a client deck</text>
+</svg>
