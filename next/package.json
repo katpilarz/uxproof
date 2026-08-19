@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "purge:global-data": "node scripts/purge-global-data.mjs",
     "reextract:files": "node scripts/reextract-files.mjs"
   },
@@ -45,6 +46,7 @@
     "eslint-config-next": "16.2.6",
     "playwright": "^1.62.1",
     "tailwindcss": "^4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   }
 }
