@@ -13,7 +13,7 @@ The bundled dataset (client "Aurelo") is 100% fictional demo data.
 | Directory | Stack | Role |
 |---|---|---|
 | `next/` | Next.js 16, React 19, Tailwind 4, Zustand, pptxgenjs | Chat UI, unified agent, deck renderer, API routes |
-| `sanity-studio/` | Sanity Studio v4 | UX research CMS: reports, intelligence, slide plans (project `ygdze74e`, dataset `production`) |
+| `sanity-studio/` | Sanity Studio v5 | UX research CMS: reports, intelligence, slide plans (project `ygdze74e`, dataset `production`) |
 | `agent-service/` | FastAPI, Pydantic, Ollama (`qwen2.5:14b`) | ContextAgent → ExtractionAgent → PlanningAgent pipeline, hand-rolled orchestration in `orchestration/pipeline.py` |
 
 Data flow: Next.js chat → FastAPI pipeline → Sanity (GROQ) → slide plan → pptxgenjs
@@ -36,13 +36,21 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   is a fixed 8-slide template (Cover → SUS headline → trend chart → 8 indicators →
   top issues → recommendations → summary → thank-you). Don't make slide structure or
   styling model-driven.
-- **Single template source of truth:** `next/src/lib/branding/brand.ts` — strictly
-  monochrome (black / white / gray only, NO accent colours, NO logos or company
-  branding anywhere in app or decks; Space Grotesk + DM Sans + DM Mono, hairline
-  rules). Never hardcode template values elsewhere; never reintroduce logos, red,
-  or accent colours. ONE deliberate exception: the cover photograph
-  (`ASSETS.COVER_IMAGE` in `next/src/lib/ppt-assets.ts`) stays in full colour —
-  do not convert it to grayscale.
+- **Single template source of truth:** `next/src/lib/branding/brand.ts` — the
+  generated DECKS are strictly monochrome (black / white / gray only, NO accent
+  colours; Space Grotesk + DM Sans + DM Mono, hairline rules). NO logos or
+  company branding anywhere in app or decks. Never hardcode template values
+  elsewhere; never reintroduce logos or accent colours into the .pptx output.
+  ONE deliberate exception: the cover photograph (`ASSETS.COVER_IMAGE` in
+  `next/src/lib/ppt-assets.ts`) stays in full colour — do not convert it to
+  grayscale.
+- **The app UI is NOT monochrome — keep the violet theme.** The web app's
+  visual identity is the violet accent: `--primary: #5B47D6` (light) /
+  `#7060e0` (dark) plus the violet-tinted neutrals in
+  `next/src/app/globals.css`, the violet logomark gradient in `top-bar.tsx` /
+  `app/icon.svg`, and violet/emerald/rose status accents across chrome
+  components. The monochrome rule above applies to the deck template only —
+  never strip colour from the app UI.
 - **Lightweight per-user auth.** Signing in is claiming an email identity (no
   password — internal tool): `/api/auth/*` + `next/src/lib/auth.ts` set an
   HMAC-signed httpOnly cookie, users live in Sanity as `user` documents, and
@@ -63,10 +71,13 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   auto-start). All report
   queries (`next/src/lib/services/report-query.ts`) filter on `user._ref`; a
   user with no data is asked to upload, not shown someone else's numbers.
-  `npm run purge:global-data` (from `next/`) removes unowned seed docs. Known
-  caveat: the FastAPI agent-service still queries reports globally for deep
-  analysis and slide plans — acceptable single-machine, scope it before any
-  multi-user deployment.
+  `npm run purge:global-data` (from `next/`) removes unowned seed docs. The
+  FastAPI agent-service is user-scoped too: every pipeline request from the
+  app carries a `user_id`, report fetches filter on it, and persisted
+  intelligence / slide plans carry an owner reference plus per-user year-scope
+  `_id`s (`slideplan_year_<year>_<userSuffix>`). Direct service calls without
+  a `user_id` fall back to global queries — keep the app side always passing
+  it.
 - **Local-only inference is a product feature.** Client research data never leaves the
   machine. Do not introduce cloud LLM calls or send research data to external services.
 - **No orchestration frameworks.** The pipeline is deliberately hand-rolled (AutoGen

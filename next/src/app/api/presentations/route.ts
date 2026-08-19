@@ -52,6 +52,7 @@ import {
   getPresentationsForUser,
 } from '@/lib/sanity';
 import { getCurrentUser } from '@/lib/auth';
+import { downloadsDir } from '@/lib/downloads';
 
 // ─── Orchestration trigger ────────────────────────────────────────────────────
 
@@ -118,11 +119,7 @@ async function triggerOrchestrator(args: OrchestratorTriggerArgs): Promise<boole
 }
 
 async function ensureDownloadsDir() {
-  const isVercel = process.env.VERCEL === '1';
-  const dir = isVercel
-    ? '/tmp/downloads'
-    : path.join(process.cwd(), 'public', 'downloads');
-  try { await fs.mkdir(dir, { recursive: true }); } catch {}
+  try { await fs.mkdir(downloadsDir(), { recursive: true }); } catch {}
 }
 
 // ─── GET — the signed-in user's generated presentations ──────────────────────
@@ -181,7 +178,7 @@ export async function POST(request: NextRequest) {
     //       supply the deck's data.
     let plan: any = null;
     if (slidePlanId) {
-      plan = await getSlidePlanById(slidePlanId);
+      plan = await getSlidePlanById(slidePlanId, user.id);
     } else if (scope === 'year' && year) {
       plan = await getSlidePlanForYear(year, user.id);
     } else if (reportId) {
@@ -287,9 +284,10 @@ export async function POST(request: NextRequest) {
     const isVercel = process.env.VERCEL === '1';
     if (isVercel) {
       try {
-        const tmpPath  = result.downloadUrl.replace('/downloads/', '/tmp/downloads/');
-        const buffer   = await fs.readFile(tmpPath);
+        // downloadUrl is /api/presentations/file/<name>; the file itself
+        // lives in downloadsDir() (outside public/ — see lib/downloads.ts).
         const fileName = result.downloadUrl.split('/').pop() || 'uxproof_report.pptx';
+        const buffer   = await fs.readFile(path.join(downloadsDir(), fileName));
         return new Response(buffer, {
           headers: {
             'Content-Type':        'application/vnd.openxmlformats-officedocument.presentationml.presentation',

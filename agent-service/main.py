@@ -87,6 +87,9 @@ class ContextRequest(BaseModel):
     mode:               str        = "single"
     comparison_quarter: str | None = None
     comparison_year:    int | None = None
+    # Sanity user _id — scopes every report fetch to this owner. Omitting
+    # it keeps the legacy global behaviour for standalone service calls.
+    user_id:            str | None = None
 
 class ExtractRequest(BaseModel):
     context_payload: dict
@@ -204,6 +207,7 @@ async def run_context(req: ContextRequest):
             mode=req.mode,
             comparison_quarter=req.comparison_quarter,
             comparison_year=req.comparison_year,
+            user_id=req.user_id,
         )
         return {"success": True, "context": result}
     except Exception as e:

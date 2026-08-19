@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useMemo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { X, MessageSquare, Plus, Loader2, Trash2 } from 'lucide-react';
 import { Button }     from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -48,6 +49,8 @@ function groupLabel(date: Date): string {
 const GROUP_ORDER = ['Today', 'Yesterday', 'This week', 'Earlier'];
 
 export function ChatHistorySidebar() {
+  const router        = useRouter();
+  const pathname      = usePathname();
   const sessions      = useSessions();
   const loading       = useSessionsLoading();
   const open          = useHistoryOpen();
@@ -75,8 +78,18 @@ export function ChatHistorySidebar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, closeHistory]);
 
+  // The session slice updates the URL with a shallow pushState, which only
+  // works while a chat surface is already rendered ('/' or '/chat/[id]').
+  // From any other route (/files, /presentations) the page component never
+  // changes, so navigate for real with the router.
+  const onChatSurface = pathname === '/' || pathname.startsWith('/chat');
+
   const handleSelect = async (sessionId: string) => {
     closeHistory();
+    if (!onChatSurface) {
+      router.push(`/chat/${sessionId}`);
+      return;
+    }
     if (sessionId === activeId) return;
     await selectSession(sessionId);
   };
@@ -84,6 +97,7 @@ export function ChatHistorySidebar() {
   const handleNew = () => {
     closeHistory();
     newSession();
+    if (!onChatSurface) router.push('/');
   };
 
   const grouped = useMemo(() => {
@@ -202,7 +216,7 @@ export function ChatHistorySidebar() {
                           className={cn(
                             'w-full max-w-full text-left pl-2.5 pr-8 py-2 rounded-lg border transition-colors duration-150 overflow-hidden',
                             isActive
-                              ? 'bg-muted border-foreground/30'
+                              ? 'bg-violet-500/10 border-violet-500/40'
                               : 'bg-transparent border-transparent hover:bg-muted/60',
                           )}
                         >
@@ -211,7 +225,7 @@ export function ChatHistorySidebar() {
                             className={cn(
                               'text-xs truncate leading-snug',
                               isActive
-                                ? 'text-foreground font-medium'
+                                ? 'text-violet-700 dark:text-violet-300 font-medium'
                                 : 'text-foreground',
                             )}
                           >
@@ -238,7 +252,7 @@ export function ChatHistorySidebar() {
                           title="Delete conversation"
                           className={cn(
                             'absolute right-1.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md',
-                            'text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors',
+                            'text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-colors',
                             'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                           )}
                         >

@@ -500,6 +500,9 @@ export async function POST(request: NextRequest) {
       const filename = extractFilename(message)!;
       const t0  = Date.now();
       const doc = await getUserFileByName(user.id, filename);
+      // The footer tag references the actual document, not the default
+      // period label — a file summary has no research period of its own.
+      contextRefOverride = { project: doc?.filename ?? filename, quarter: 'File summary' };
       if (!doc) {
         responseContent = `I couldn't find **${filename}** in your files. Check the **Files** page for the exact name, or upload it with the **+** button.`;
         agentInfo       = { agent: 'uxproof assistant', processingTime: '0.0s' };
@@ -517,8 +520,7 @@ export async function POST(request: NextRequest) {
           processingTime: `${((Date.now() - t0) / 1000).toFixed(1)}s`,
         };
       }
-      processingType     = 'analysis';
-      contextRefOverride = undefined;
+      processingType = 'analysis';
 
     } else if (intent === 'deep') {
       // Deep analysis still uses the agent pipeline + the full-report formatter —

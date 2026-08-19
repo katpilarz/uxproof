@@ -11,6 +11,7 @@ export default {
       to: [{ type: 'user' }],
     },
     { name: 'title', title: 'Presentation Title', type: 'string' },
+    { name: 'quarter', title: 'Period Label', type: 'string' },
     { name: 'slidesCount', title: 'Number of Slides', type: 'number' },
     {
       name: 'status',
@@ -25,5 +26,6 @@ export default {
     },
     { name: 'downloadUrl', title: 'Download URL', type: 'url' },
     { name: 'generatedDate', title: 'Generated Date', type: 'datetime' },
+    { name: 'createdAt', title: 'Created At', type: 'datetime' },
   ],
 };

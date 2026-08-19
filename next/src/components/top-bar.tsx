@@ -31,7 +31,7 @@ function PanelLeftRounded({ className }: { className?: string }) {
   );
 }
 
-// uxproof logomark — app-icon tile: graphite gradient, a checkmark whose
+// uxproof logomark — app-icon tile: violet gradient, a checkmark whose
 // tail rises past the tile's optical centre (evidence validated ✓) with
 // a spark dot where the insight "lands". Mirrored as the favicon in
 // app/icon.svg — keep the two in sync. Exported for the login screen.
@@ -40,8 +40,8 @@ export function UxproofMark({ className }: { className?: string }) {
     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
       <defs>
         <linearGradient id="uxg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#3f3f46" />
-          <stop offset="1" stopColor="#18181b" />
+          <stop offset="0" stopColor="#8B75FF" />
+          <stop offset="1" stopColor="#5B47D6" />
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="9" fill="url(#uxg)" />
@@ -120,7 +120,7 @@ export function TopBar({
               >
                 <UxproofMark className="size-6" />
                 <span className="text-[17px] font-semibold tracking-tight lowercase leading-none">
-                  <span className="text-foreground">ux</span>
+                  <span className="text-violet-600 dark:text-violet-400">ux</span>
                   <span className="text-foreground">proof</span>
                 </span>
               </Button>

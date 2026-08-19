@@ -41,14 +41,14 @@ interface PresentationRow {
 }
 
 const GRADIENTS = [
-  'from-zinc-700 to-zinc-900',
-  'from-zinc-200 to-zinc-400',
-  'from-zinc-500 to-zinc-700',
-  'from-zinc-300 to-zinc-500',
-  'from-zinc-800 to-zinc-950',
-  'from-zinc-100 to-zinc-300',
-  'from-zinc-600 to-zinc-800',
-  'from-zinc-400 to-zinc-600',
+  'from-purple-600 to-blue-500',
+  'from-orange-400 to-pink-400',
+  'from-cyan-400 to-indigo-600',
+  'from-blue-400 to-emerald-400',
+  'from-pink-300 to-purple-600',
+  'from-sky-300 to-blue-600',
+  'from-rose-400 to-fuchsia-600',
+  'from-indigo-400 to-cyan-500',
 ];
 
 function gradientFor(id: string): string {
@@ -124,7 +124,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
           {stats.map((stat) => (
             <Card
               key={stat.label}
-              className="p-5 border border-border bg-white dark:bg-card shadow-sm shadow-zinc-200/50 dark:shadow-none"
+              className="p-5 border border-border bg-white dark:bg-card shadow-sm shadow-violet-100/50 dark:shadow-none"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -133,7 +133,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
                     {loading ? '—' : stat.value}
                   </p>
                 </div>
-                <div className="size-10 rounded-lg flex items-center justify-center bg-muted text-foreground">
+                <div className="size-10 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-600 dark:text-violet-400">
                   <stat.icon className="size-5" />
                 </div>
               </div>
@@ -221,14 +221,14 @@ export function Dashboard({ onChatClick }: DashboardProps) {
 
             {/* Add New — high-contrast card */}
             <Card
-              className="overflow-hidden border-0 cursor-pointer group transition-all duration-200 hover:scale-[1.01] bg-[#0f0f0f] dark:bg-white"
+              className="overflow-hidden border-0 cursor-pointer group transition-all duration-200 hover:scale-[1.01] bg-[#0f0f1c] dark:bg-white"
               onClick={() => onChatClick?.()}
             >
               <div className="h-full flex flex-col items-center justify-center text-center min-h-[280px] relative overflow-hidden">
 
                 {/* Decorative circles — clipped by overflow-hidden */}
-                <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/12 dark:bg-black/8 pointer-events-none" />
-                <div className="absolute -bottom-10 -left-10 w-36 h-36 rounded-full bg-white/8 dark:bg-black/6 pointer-events-none" />
+                <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-violet-500/15 dark:bg-violet-400/12 pointer-events-none" />
+                <div className="absolute -bottom-10 -left-10 w-36 h-36 rounded-full bg-violet-600/10 dark:bg-violet-500/8 pointer-events-none" />
                 <div className="absolute top-1/2 -translate-y-1/2 -right-6 w-20 h-20 rounded-full bg-white/4 dark:bg-black/4 pointer-events-none" />
 
                 {/* Content */}
@@ -238,19 +238,19 @@ export function Dashboard({ onChatClick }: DashboardProps) {
                   <div className="relative mb-6 w-10 h-8">
                     <div className="absolute -top-1 -left-1 w-10 h-8 rounded-md bg-white/15 dark:bg-black/10 rotate-[-8deg]" />
                     <div className="absolute -top-0.5 left-0.5 w-10 h-8 rounded-md bg-white/20 dark:bg-black/14 rotate-[-3deg]" />
-                    <div className="relative w-10 h-8 rounded-md bg-white/90 dark:bg-[#0f0f0f]/90 flex items-center justify-center">
+                    <div className="relative w-10 h-8 rounded-md bg-white/90 dark:bg-[#0f0f1c]/90 flex items-center justify-center">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M7 1.5V12.5M1.5 7H12.5" stroke="#0f0f0f" strokeWidth="1.5" strokeLinecap="round" className="dark:stroke-white" />
+                        <path d="M7 1.5V12.5M1.5 7H12.5" stroke="#0f0f1c" strokeWidth="1.5" strokeLinecap="round" className="dark:stroke-white" />
                       </svg>
                     </div>
                   </div>
 
-                  <h3 className="font-medium mb-2 text-white dark:text-[#0f0f0f]">
+                  <h3 className="font-medium mb-2 text-white dark:text-[#0f0f1c]">
                     {presentations.length === 0
                       ? 'Generate Your First Presentation'
                       : 'Generate New Presentation'}
                   </h3>
-                  <p className="text-sm text-white/50 dark:text-[#0f0f0f]/50 mb-6 max-w-[190px]">
+                  <p className="text-sm text-white/50 dark:text-[#0f0f1c]/50 mb-6 max-w-[190px]">
                     Use the AI chat to create a new research presentation
                   </p>
 
@@ -258,7 +258,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
                   <div className="px-5 py-2 rounded-full text-xs font-medium tracking-wide
                     bg-white/12 group-hover:bg-white/20
                     dark:bg-black/8 dark:group-hover:bg-black/14
-                    text-white dark:text-[#0f0f0f]
+                    text-white dark:text-[#0f0f1c]
                     ring-1 ring-white/20 dark:ring-black/10
                     transition-colors duration-200"
                   >

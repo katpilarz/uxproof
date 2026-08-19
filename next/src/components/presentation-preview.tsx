@@ -284,7 +284,7 @@ export function PresentationPreview({
             <p className="text-xs text-muted-foreground">{count} slides · research template</p>
           </div>
           <Badge variant="secondary" className="gap-1 shrink-0">
-            <Check className="size-3 text-foreground" />
+            <Check className="size-3 text-emerald-500" />
             Ready
           </Badge>
         </div>

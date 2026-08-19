@@ -16,6 +16,7 @@ next-env.d.ts
 
 # Generated decks — keep the folder, never the files
 next/public/downloads/*.pptx
+next/downloads/
 
 # ── Sanity Studio (sanity-studio/) ───────────────────────────────────
 sanity-studio/dist/

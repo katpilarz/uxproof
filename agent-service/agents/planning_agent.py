@@ -366,19 +366,20 @@ def _r2(n) -> float:
         return 0.0
 
 
-def _derive_kpi8(primary: dict) -> list[dict]:
+def _derive_kpi8(primary: dict, delta: dict | None = None) -> list[dict]:
     """
-    Produce 8 fully-populated KPI items from the primary report data.
-    Every value is either taken directly from primary[] or derived from
-    figures that ARE present, so slide 4 never renders "Pending" tiles
-    unless the report itself is empty.
+    Produce 8 KPI items for slide 4 STRICTLY from real report data.
 
-    Derived estimates (fake-data heuristics, stable and plausible):
-      - Avg Time on Task: better usability → faster tasks. 260 - SUS,
-        clamped to [90, 300] seconds.
-      - Findings Resolved: ~60% of participants each surface one
-        actionable finding that gets fixed.
+    Grounding rules (CLAUDE.md: the pipeline never invents data):
+      - values come only from primary[]
+      - change percentages come from the context's REAL delta (vs the
+        comparison period) when available; the report's own susChange for
+        the SUS tile; otherwise 0 / stable — never a made-up multiplier
+      - metrics the report does not carry (Avg Time on Task, Findings
+        Resolved) render as "N/A" instead of the previous fake-data
+        heuristics (260 − SUS, participants × 0.6)
     """
+    d     = delta or {}
     sus   = float(primary.get("sus_score", 0) or 0)
     susd  = float(primary.get("sus_change", 0) or 0)
     ts    = float(primary.get("task_success_rate", 0) or 0)
@@ -388,31 +389,41 @@ def _derive_kpi8(primary: dict) -> list[dict]:
     conv  = float(primary.get("conversion_rate", 0) or 0)
 
     time_on_task = primary.get("avg_time_on_task")
-    if time_on_task in (None, "", 0):
-        time_on_task = int(min(300, max(90, 260 - sus))) if sus else 0
-    findings = primary.get("findings_resolved")
-    if findings in (None, "", 0) and part > 0:
-        findings = int(part * 0.6)
+    findings     = primary.get("findings_resolved")
 
-    def kpi(label: str, value: str, change, trend: str = "stable") -> dict:
+    def real_delta(key: str, fallback: float = 0.0) -> float:
+        v = d.get(key)
+        try:
+            return float(v) if v is not None else float(fallback)
+        except (TypeError, ValueError):
+            return float(fallback)
+
+    def kpi(label: str, value: str, change, trend: str | None = None) -> dict:
         safe_value = value if (value not in (None, "", "—")) else "N/A"
+        ch = _r2(change)
+        if trend is None:
+            trend = "up" if ch > 0 else "down" if ch < 0 else "stable"
         return {
             "_type": T_KPI,
             "label": label,
             "value": str(safe_value),
-            "change": _r2(change),
+            "change": ch,
             "trend": trend,
         }
 
     return [
-        kpi("SUS Score",         f"{sus:.1f}",          susd,        "up" if susd >= 0 else "down"),
-        kpi("Task Success Rate", f"{ts:.1f}%",          susd * 1.1,  "up" if susd >= 0 else "down"),
-        kpi("NPS",               f"{nps:+.0f}",         susd * 2.0,  "up" if susd >= 0 else "down"),
-        kpi("Error Rate",        f"{err}%",             -abs(susd) * 0.4, "down"),
-        kpi("Participants",      f"{int(part):,}",      4.2,         "up"),
-        kpi("Conversion Rate",   f"{conv}%",            susd * 0.5,  "up" if susd >= 0 else "down"),
-        kpi("Avg Time on Task",  f"{int(time_on_task or 0)}s", -abs(susd) * 0.8, "down"),
-        kpi("Findings Resolved", f"{int(findings or 0)}", susd * 0.9, "up" if susd >= 0 else "down"),
+        kpi("SUS Score",         f"{sus:.1f}",     real_delta("sus_score", susd)),
+        kpi("Task Success Rate", f"{ts:.1f}%",     real_delta("task_success_rate")),
+        kpi("NPS",               f"{nps:+.0f}",    real_delta("nps_score")),
+        kpi("Error Rate",        f"{err}%",        real_delta("error_rate")),
+        kpi("Participants",      f"{int(part):,}", real_delta("participants")),
+        kpi("Conversion Rate",   f"{conv}%",       real_delta("conversion_rate")),
+        kpi("Avg Time on Task",
+            f"{int(time_on_task)}s" if time_on_task not in (None, "", 0) else "N/A",
+            0, "stable"),
+        kpi("Findings Resolved",
+            f"{int(findings)}" if findings not in (None, "", 0) else "N/A",
+            0, "stable"),
     ]
 
 
@@ -544,7 +555,7 @@ def _year_anchor(ctx: dict) -> dict:
 # SYSTEM PROMPT
 # ──────────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = f"""You are a UX research presentation strategist at PAISAK4U.
+SYSTEM_PROMPT = f"""You are a UX research presentation strategist.
 Produce a STRICT 8-slide client-facing UX report deck plan. Return ONLY valid JSON. No markdown fences.
 
 SLIDE STRUCTURE IS FIXED — exactly 8 slides in this order:
@@ -606,13 +617,13 @@ KPI COMPLETENESS — slide 4 MUST have all 8 KPIs filled with real values.
     4. Error Rate         (e.g. "4.3%")
     5. Participants       (use participants)
     6. Conversion Rate    (e.g. "3.1%")
-    7. Avg Time on Task   (estimate 260 - SUS seconds if unknown, e.g. "181s")
-    8. Findings Resolved  (estimate participants × 0.6 if unknown)
+    7. Avg Time on Task   (only if the data provides it; otherwise "N/A")
+    8. Findings Resolved  (only if the data provides it; otherwise "N/A")
 
   NEVER use "****", null, or "Pending" for KPI values.
-  ALWAYS derive a numeric estimate when a direct value is missing — use
-  the formulas above. The reader sees "Pending" as missing data; the
-  reader sees "78.4" as a real result.
+  NEVER estimate, derive, or invent a number that is not in the provided
+  data — a metric the data does not contain is exactly "N/A". Copy the
+  pre-computed KPI values below verbatim.
 
 EACH SLIDE'S content[] IS A TYPED LIST. The renderer branches on _type:
 
@@ -676,7 +687,7 @@ def _build_prompt(ctx: dict, intel: dict, style: str) -> str:
     success_data  = [r.get("task_success_rate", 0) for r in chart_reports]
 
     # Pre-compute KPI derivations so the model can use them verbatim
-    derived = _derive_kpi8(primary)
+    derived = _derive_kpi8(primary, delta)
 
     # Display period: what the LLM should use IN SLIDE TITLES.
     raw_period = ctx.get("period", "Unknown")
@@ -852,7 +863,7 @@ class PlanningAgent:
         primary = ctx.get("primary") or {}
         if _is_year_mode(ctx) and not primary:
             primary = _year_anchor(ctx)
-        derived = _derive_kpi8(primary)
+        derived = _derive_kpi8(primary, ctx.get("delta"))
         derived_by_label = {k["label"]: k for k in derived}
 
         for slide in plan.get("slides", []):
@@ -1052,6 +1063,8 @@ class PlanningAgent:
             "slides":            slides_out,
             "generatedAt":       datetime.datetime.utcnow().isoformat() + "Z",
         }
+        if user_id:
+            doc["user"] = {"_type": "reference", "_ref": user_id}
 
         if _diagnostic():
             print(f"[planning_agent.persist] slidePlan _id={doc['_id']}, "
@@ -1149,11 +1162,11 @@ class PlanningAgent:
                 kpi_block("SUS Change",   f"{susd:+.1f} pts", susd, "up" if susd >= 0 else "down"),
                 kpi_block("Task Success", f"{ts:.1f}%",       0,    "stable"),
                 kpi_block("NPS",          f"{nps:+.0f}",      nps,  "up" if nps >= 0 else "down"),
-                kpi_block("Error Rate",   f"{err}%",          -abs(susd) * 0.4, "down"),
+                kpi_block("Error Rate",   f"{err}%",          (ctx.get("delta") or {}).get("error_rate") or 0, "down"),
             ]
 
         # ── Slide 4: derive all 8 KPIs from primary data ────────────────────
-        slide4_kpis = _derive_kpi8(p)
+        slide4_kpis = _derive_kpi8(p, ctx.get("delta"))
 
         chart_block = {
             "_type": T_CHART,
@@ -1247,7 +1260,7 @@ class PlanningAgent:
         slides = [
             {"slide_number": 1, "slide_type": "title",
              "title": f"{display_period}\nUX Report",
-             "subtitle": f"{client} — PAISAK4U UX Research", "content": [], "bullets": [],
+             "subtitle": f"{client} — UX Research", "content": [], "bullets": [],
              "chart_type": "none", "chart_data": {}, "speaker_notes": "Welcome attendees."},
             {"slide_number": 2, "slide_type": "kpi",
              "title": slide2_hero,

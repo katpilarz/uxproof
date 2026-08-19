@@ -280,9 +280,17 @@ function buildPreciseMetric(ctx: ReportContext, key: MetricKey): string {
 // ─── Block builders (used by the full-analysis path) ─────────────────────────
 
 function kpiBlock(r: SanityReport): string {
-  return r.kpis.length
-    ? r.kpis.map(k => `• ${k.label}: **${k.value}** ${arrow(k.trend)} ${sign(k.change)}${k.change}%`).join('\n')
-    : `• SUS Score: **${r.susScore} / 100** (${pts(r.susChange)})\n• Task Success: **${r.taskSuccessRate}%**\n• NPS: **${sign(r.npsScore)}${r.npsScore}**\n• Error Rate: **${r.errorRate}%**`;
+  if (r.kpis.length) {
+    return r.kpis.map(k => `• ${k.label}: **${k.value}** ${arrow(k.trend)} ${sign(k.change)}${k.change}%`).join('\n');
+  }
+  // Model-extracted reports may carry only some metrics — list what exists.
+  return [
+    `• SUS Score: **${r.susScore} / 100**${r.susChange != null ? ` (${pts(r.susChange)})` : ''}`,
+    r.taskSuccessRate != null ? `• Task Success: **${r.taskSuccessRate}%**` : '',
+    r.npsScore        != null ? `• NPS: **${sign(r.npsScore)}${r.npsScore}**` : '',
+    r.errorRate       != null ? `• Error Rate: **${r.errorRate}%**` : '',
+    r.participants    != null ? `• Participants: **${r.participants}**` : '',
+  ].filter(Boolean).join('\n');
 }
 
 function insightBlock(r: SanityReport): string {
@@ -421,7 +429,18 @@ function buildPresentationPreview(ctx: ReportContext, scope: PresentationScope):
   const susNote = ctx.delta
     ? `, ${pts(ctx.delta.susScore)} vs ${ctx.comparisonPeriod}`
     : '';
-  return `**Generating ${displayPeriod(ctx.period)} presentation**\n\nSUS **${r.susScore}** (${pts(r.susChange)} QoQ${susNote}), task success **${r.taskSuccessRate}%**, NPS **${sign(r.npsScore)}${r.npsScore}**.\n\n8-slide research deck — generating now, the download button appears below when it’s ready.`;
+  // Model-extracted reports may carry only some metrics — mention only what
+  // the record actually has instead of printing "null".
+  const susQualifier = [
+    r.susChange != null ? `${pts(r.susChange)} QoQ` : '',
+    susNote.replace(/^, /, ''),
+  ].filter(Boolean).join(', ');
+  const bits = [
+    `SUS **${r.susScore}**${susQualifier ? ` (${susQualifier})` : ''}`,
+    r.taskSuccessRate != null ? `task success **${r.taskSuccessRate}%**` : '',
+    r.npsScore        != null ? `NPS **${sign(r.npsScore)}${r.npsScore}**` : '',
+  ].filter(Boolean).join(', ');
+  return `**Generating ${displayPeriod(ctx.period)} presentation**\n\n${bits}.\n\n8-slide research deck — generating now, the download button appears below when it’s ready.`;
 }
 
 function buildResponse(
