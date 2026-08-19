@@ -173,6 +173,26 @@ export async function POST(request: NextRequest) {
       reportId, quarter, year, slidePlanId, scope,
     });
 
+    // ── 0. Validate the period before anything else ───────────────────────
+    // A nonsense period ("Q9", year "banana") must be refused, not filed:
+    // without this the route happily rendered a deck and persisted a
+    // presentation document for a quarter that cannot exist.
+    if (quarter !== undefined && !/^Q[1-4]$/i.test(String(quarter))) {
+      return NextResponse.json(
+        { error: `Invalid quarter "${quarter}". Expected Q1, Q2, Q3 or Q4.` },
+        { status: 400 },
+      );
+    }
+    if (year !== undefined) {
+      const y = Number(year);
+      if (!Number.isInteger(y) || y < 2000 || y > 2100) {
+        return NextResponse.json(
+          { error: `Invalid year "${year}". Expected a year between 2000 and 2100.` },
+          { status: 400 },
+        );
+      }
+    }
+
     // ── 1. Fetch the slidePlan from Sanity — scoped to the signed-in
     //       user, so a stale/foreign report for the same period can never
     //       supply the deck's data.
@@ -218,9 +238,7 @@ export async function POST(request: NextRequest) {
         plan = await getSlidePlanForYear(year, user.id);
         console.log('[presentations] post-orchestrator plan _id:', plan?._id);
       } else if (!plan) {
-        // Orchestrator failed AND there was no fallback — render defaults
-        // so the user gets feedback rather than a 500.
-        console.warn('[presentations] orchestrator failed and no fallback plan; rendering defaults');
+        console.warn('[presentations] orchestrator failed and no fallback plan');
       }
     } else if (needsQuarterPlan) {
       console.log(`[presentations] no plan for ${quarter} ${year}; triggering orchestrator`);
@@ -232,10 +250,27 @@ export async function POST(request: NextRequest) {
 
     logSlidePlanShape(plan);
 
+    // ── 2b. Refuse rather than ship a deck that isn't about anything ──────
+    // With no plan, buildDefaultSlides() renders a complete, professional
+    // -looking deck whose SUS headline is an em-dash and whose cover names
+    // a period nobody asked for. A 200 on that is a lie about the content;
+    // failing honestly lets the UI show its error state instead.
+    // (Defaults are still used below to pad a short plan to 8 slides.)
+    if (!plan) {
+      console.warn('[presentations] no slide plan available; refusing to render a placeholder deck');
+      return NextResponse.json(
+        {
+          error:
+            'No analysis is available for that period yet. The analysis pipeline ' +
+            'could not be reached — start the agent service and try again, or ask ' +
+            'a question about the period first to generate its analysis.',
+        },
+        { status: 503 },
+      );
+    }
+
     // ── 3. Sanity slidePlan → SlideConfig[] ───────────────────────────────
-    let slides: SlideConfig[] = plan
-      ? loadSlidesFromPlan(plan)
-      : buildDefaultSlides();
+    let slides: SlideConfig[] = loadSlidesFromPlan(plan);
 
     // Enforce 8 slides, numbered 1..8
     const defaults = buildDefaultSlides();
