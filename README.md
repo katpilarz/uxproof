@@ -4,7 +4,7 @@
 (Katarzyna Pilarz) that turns quarterly UX research data into branded
 PowerPoint presentations — making UX data validation easy and the
 hand-off to clients a one-click affair.
-
+ 
 Ask in plain language — *"Analyse Q3 2025"*, *"Compare Q2 vs Q3"*,
 *"Generate 2025 presentation"* — and uxproof queries the research
 database, runs a multi-agent analysis, and renders a fixed 8-slide

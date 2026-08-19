@@ -1,3 +1,5 @@
+'use client';
+
 import { Cpu, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
