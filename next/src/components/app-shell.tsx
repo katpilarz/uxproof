@@ -16,6 +16,7 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { MotionConfig } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { TopBar }             from '@/components/top-bar';
 import { SettingsDialog }     from '@/components/settings-dialog';
@@ -80,36 +81,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return (
-      <>
+      <MotionConfig reducedMotion="user">
         <LoginScreen />
         <Toaster />
-      </>
+      </MotionConfig>
     );
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
-      <Toaster />
-      <TopBar
-        onDashboardClick={handleDashboardClick}
-        onFilesClick={handleFilesClick}
-        onLogoClick={handleLogoClick}
-        onHistoryClick={toggleHistory}
-        historyOpen={historyOpen}
-        onNewChatClick={handleLogoClick}
-      />
+    <MotionConfig reducedMotion="user">
+      <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
+        <Toaster />
+        <TopBar
+          onDashboardClick={handleDashboardClick}
+          onFilesClick={handleFilesClick}
+          onLogoClick={handleLogoClick}
+          onHistoryClick={toggleHistory}
+          historyOpen={historyOpen}
+          onNewChatClick={handleLogoClick}
+        />
 
-      <div className="flex-1 flex overflow-hidden pt-14 relative">
-        <ChatHistorySidebar />
-        <div className="flex-1 min-w-0">
-          {children}
+        <div className="flex-1 flex overflow-hidden pt-14 relative">
+          <ChatHistorySidebar />
+          <div className="flex-1 min-w-0">
+            {children}
+          </div>
         </div>
-      </div>
 
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={(o) => (o ? openSettings() : closeSettings())}
-      />
-    </div>
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={(o) => (o ? openSettings() : closeSettings())}
+        />
+      </div>
+    </MotionConfig>
   );
 }
