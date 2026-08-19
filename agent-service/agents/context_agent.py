@@ -93,13 +93,16 @@ def _norm_report(r: dict) -> NormalisedReport:
         product           = r.get("product", ""),
         platform          = r.get("platform", ""),
         methods           = list(r.get("methods") or []),
-        sus_score         = float(r.get("susScore", 0)),
-        sus_change        = float(r.get("susChange", 0)),
-        task_success_rate = float(r.get("taskSuccessRate", 0)),
-        nps_score         = float(r.get("npsScore", 0)),
-        participants      = int(r.get("participants", 0)),
-        error_rate        = float(r.get("errorRate", 0)),
-        conversion_rate   = float(r.get("conversionRate", 0)),
+        # `or 0`, not a .get default: the GROQ projection returns an explicit
+        # null for any metric an uploaded report doesn't carry, so the key is
+        # present with a None value and a .get default would never apply.
+        sus_score         = float(r.get("susScore") or 0),
+        sus_change        = float(r.get("susChange") or 0),
+        task_success_rate = float(r.get("taskSuccessRate") or 0),
+        nps_score         = float(r.get("npsScore") or 0),
+        participants      = int(r.get("participants") or 0),
+        error_rate        = float(r.get("errorRate") or 0),
+        conversion_rate   = float(r.get("conversionRate") or 0),
         # `or []` + per-field defaults: uploaded reports may lack these
         # arrays entirely, and model-extracted entries may omit subfields.
         kpis     = [NormalisedKPI(
