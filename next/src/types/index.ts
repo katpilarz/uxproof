@@ -168,36 +168,6 @@ export type ThemeProviderState = {
   setTheme: (theme: Theme) => void;
 };
 
-// ─── Chat state / slice ───────────────────────────────────────────────────────
-
-export interface ChatState {
-  messages:          Message[];
-  currentView:       'chat' | 'dashboard';
-  showDemo:          boolean;
-  aiContext:         AIContext;
-  loading: {
-    chat:         boolean;
-    presentation: boolean;
-    initialData:  boolean;
-  };
-  error:             string | null;
-  selectedProjectId: string | null;
-}
-
-export interface ChatSlice {
-  state:   ChatState;
-  actions: {
-    sendMessage:          (message: string, context?: any) => Promise<void>;
-    resetChat:            () => void;
-    setView:              (view: 'chat' | 'dashboard') => void;
-    setShowDemo:          (show: boolean) => void;
-    setAIContext:         (context: AIContext) => void;
-    setSelectedProjectId: (id: string | null) => void;
-    setLoading:           (type: keyof ChatState['loading'], isLoading: boolean) => void;
-    setError:             (error: string | null) => void;
-  };
-}
-
 // ─── User settings ────────────────────────────────────────────────────────────
 
 export interface UserSettings {

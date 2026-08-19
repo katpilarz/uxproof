@@ -1,70 +1,102 @@
 # uxproof
 
-**UX evidence, client-ready.** An internal tool by [PAISAK4U](https://paisak4u.com)
-(Katarzyna Pilarz) that turns quarterly UX research data into branded
-PowerPoint presentations — making UX data validation easy and the
-hand-off to clients a one-click affair.
- 
-Ask in plain language — *"Analyse Q3 2025"*, *"Compare Q2 vs Q3"*,
-*"Generate 2025 presentation"* — and uxproof queries the research
-database, runs a multi-agent analysis, and renders a fixed 8-slide
-.pptx deck in PAISAK4U branding.
+**Upload the research, talk to it, get the deck.** A chat-first AI tool by
+Katarzyna Pilarz that turns uploaded UX research into client-ready,
+monochrome 8-slide PowerPoint decks — every number grounded, every model
+step backed by a deterministic fallback.
 
-> The bundled dataset is **100% fictional**: nine quarters of a UX
-> research retainer for "Aurelo", an invented digital-commerce client.
-> Swap in real client data by editing the Sanity documents.
+Ask in plain language — *"Analyse Q3 2025"*, *"Compare Q2 vs Q3"*,
+*"Generate the 2025 presentation"* — and uxproof answers from **your
+uploaded research only**, then renders a fixed-template `.pptx` deck on
+demand.
+
+## The trust boundary
+
+The one rule that shapes everything: **the LLM never invents data.**
+
+- The model may **select, narrate, and convert** — pick relevant findings,
+  phrase answers, turn prose documents into the structured report shape.
+- Code owns **every number, the slide structure, the styling, and
+  availability.** Model-extracted numbers survive only if they appear
+  literally in the source document (`next/src/lib/report-parsing.ts`);
+  chat replies and summaries whose numbers can't be traced are discarded
+  for their deterministic templates.
+- **Every model step has a deterministic fallback** — with Ollama fully
+  offline, decks still generate.
+
+Inference is local-only (Ollama, default `qwen2.5:14b`): research data
+never leaves the machine.
+
+![Division of authority](context/case-study/diagrams/uxproof-diagram-authority.svg)
+
+## How it works
+
+1. **Sign in** — claiming an email identity (HMAC-signed cookie, users in
+   Sanity; no password, internal tool).
+2. **Upload** research files via the chat's **+** button (CSV, JSON, PDF,
+   TXT, Markdown). Structured rows (quarter + year + SUS score) parse
+   deterministically into user-owned `report` documents; prose documents
+   are converted by the local model under the literal-value guardrail.
+3. **Ask** — questions, comparisons, summaries; answers are built
+   deterministically from your reports, optionally rewritten
+   conversationally (numbers re-validated) by the local model.
+4. **Generate** — a presentation card renders idle; on click, the FastAPI
+   pipeline (Context → Extraction → Planning, hand-rolled, typed Pydantic
+   contracts) builds a slide plan and pptxgenjs renders the deck.
+
+![System architecture](context/case-study/diagrams/uxproof-diagram-architecture.svg)
 
 ## Architecture
 
 | Directory | Stack | Role |
 |---|---|---|
-| [next/](next/) | Next.js 16, React 19, Tailwind 4, pptxgenjs, Zustand | Chat UI, unified agent, deck renderer, API routes |
-| [sanity-studio/](sanity-studio/) | Sanity Studio v4 | UX research CMS: reports, intelligence, slide plans |
-| [agent-service/](agent-service/) | FastAPI, Ollama, Pydantic | ContextAgent → ExtractionAgent → PlanningAgent pipeline |
+| [next/](next/) | Next.js 16, React 19, Tailwind 4, Zustand, pptxgenjs | Chat UI, API routes, deck renderer |
+| [sanity-studio/](sanity-studio/) | Sanity Studio v5 | CMS: users, reports, files, sessions, intelligence, slide plans |
+| [agent-service/](agent-service/) | FastAPI, Pydantic, Ollama | Context → Extraction → Planning pipeline (no orchestration framework) |
 
-## The 8-slide deck
+## The deck
 
-Cover → Headline SUS score → Usability trend chart → 8 UX indicators →
-Top usability issues → Recommendations → Research summary → Thank you.
+Fixed 8-slide template: Cover → Headline SUS score → Trend chart → 8 UX
+indicators → Top issues → Recommendations → Summary → Thank you.
 
-Styling follows paisak4u.com — black/white foundation, Schibsted
-Grotesk + IBM Plex Mono, hairline rules — with violet / graphite / pink
-accents reserved for data. The single source of truth is
-[next/src/lib/branding/brand.ts](next/src/lib/branding/brand.ts).
+Strictly monochrome — black / white / gray, Space Grotesk + DM Sans +
+DM Mono, hairline rules, no logos. The single source of truth is
+[next/src/lib/branding/brand.ts](next/src/lib/branding/brand.ts); layout
+never passes through the model, so the deck cannot drift. (One deliberate
+exception: the cover photograph stays in full colour.) The **app UI** keeps
+its own violet identity — the monochrome rule applies to decks only.
 
-## Setup
+## Running locally
 
-1. **Sanity project**: `uxproof` (`ygdze74e`), dataset `production` —
-   already created and preconfigured throughout. Create an **Editor API
-   token** at [manage](https://www.sanity.io/manage/project/ygdze74e)
-   → API → Tokens.
-2. **Fill in env files** (all have `.env.example` templates):
-   - `next/.env.local` — `SANITY_API_TOKEN`
-   - `agent-service/.env` — `SANITY_API_TOKEN`
-   - `sanity-studio/.env` — no token needed (Studio uses your login)
-3. **Demo data** is already imported. To re-seed or run the Studio:
-   ```bash
-   cd sanity-studio
-   npm install
-   npx sanity dataset import seed-reports.ndjson production --replace
-   npm run dev          # Studio on http://localhost:3333
-   ```
-4. **Start the agent service** (needs [Ollama](https://ollama.com) with
-   `qwen2.5:14b` pulled — decks still generate without it via
-   deterministic fallbacks):
-   ```bash
-   cd agent-service
-   python -m venv .venv && source .venv/bin/activate
-   pip install -r requirements.txt
-   uvicorn main:app --port 8001
-   ```
-5. **Run the app**:
-   ```bash
-   cd next
-   npm install
-   npm run dev          # http://localhost:3000
-   ```
+```bash
+# Next.js app (port 3000)
+cd next && npm run dev
 
-For pixel-perfect decks, install the two Google Fonts locally so
-PowerPoint can render them: [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk)
-and [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono).
+# Agent service (port 8001) — venv .venv, requirements.txt
+cd agent-service && uvicorn main:app --port 8001
+
+# Sanity Studio (port 3333)
+cd sanity-studio && npm run dev
+```
+
+Copy each service's `.env.example` and fill in the Sanity API token
+(env-only, never committed). Ollama runs locally at `localhost:11434`.
+
+## Tests
+
+```bash
+cd next && npm test
+```
+
+The suite covers the trust boundary: the structured-parse acceptance gate,
+the number-grounding guardrail (including its deliberately conservative
+false-negative bias), truncated-model-reply salvage, and the summary
+guardrail with its deterministic fallback.
+
+## Data notes
+
+- **All research data is user-uploaded** — there is no global dataset. A
+  user with no data is asked to upload, never shown someone else's numbers.
+- `sanity-studio/seed-reports.ndjson` is a 100% fictional demo dataset
+  (client "Aurelo"); seeded reports carry no owner, so the per-user app
+  ignores them. `npm run purge:global-data` (from `next/`) removes them.
