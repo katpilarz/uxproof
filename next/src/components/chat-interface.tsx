@@ -51,11 +51,13 @@ import {
   useUploadFile,
   useRestoring,
   useIsNewSession,
+  usePendingPrompt,
+  useSetPendingPrompt,
   useStore,
 } from '@/store';
 
 // Kept in sync with /api/files SUPPORTED
-const UPLOAD_ACCEPT = '.txt,.md,.markdown,.csv,.json';
+const UPLOAD_ACCEPT = '.txt,.md,.markdown,.csv,.json,.pdf';
 
 function getQueryType(msg: string): string {
   const q = msg.toLowerCase();
@@ -86,9 +88,9 @@ const panelVariants = {
 };
 
 const QUICK_ACTIONS = [
-  { icon: Sparkles,   label: 'Generate 2025 presentation',    color: 'text-violet-600 dark:text-violet-400' },
-  { icon: BarChart3,    label: 'Compare Q3 vs Q4 2025',         color: 'text-rose-600 dark:text-rose-400' },
-  { icon: TrendingUp, label: 'Generate Q1 2026 presentation', color: 'text-emerald-600 dark:text-emerald-400' },
+  { icon: Sparkles,   label: 'Generate 2025 presentation',    color: 'text-foreground' },
+  { icon: BarChart3,    label: 'Compare Q3 vs Q4 2025',         color: 'text-zinc-700 dark:text-zinc-300' },
+  { icon: TrendingUp, label: 'Generate Q1 2026 presentation', color: 'text-zinc-500 dark:text-zinc-400' },
 ];
 
 export function ChatInterface() {
@@ -143,6 +145,17 @@ export function ChatInterface() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
+  // Active prompts handed over from other pages (/files CTAs): consume the
+  // pending prompt once and send it automatically in this fresh session.
+  const pendingPrompt    = usePendingPrompt();
+  const setPendingPrompt = useSetPendingPrompt();
+  useEffect(() => {
+    if (!pendingPrompt || isProcessing || restoring) return;
+    setPendingPrompt(null);
+    handleSend(pendingPrompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPrompt]);
+
   const queryType  = getQueryType(lastQuery);
   const lastMsgIdx = messages.length - 1;
 
@@ -160,8 +173,8 @@ export function ChatInterface() {
       initial="hidden" animate="visible" exit="exit"
       className="flex gap-4 justify-start"
     >
-      <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-        <Sparkles className="size-4 text-white" />
+      <div className="size-8 rounded-lg bg-foreground flex items-center justify-center flex-shrink-0 mt-0.5">
+        <Sparkles className="size-4 text-background" />
       </div>
       <div className="rounded-tl-xl rounded-tr-xl rounded-br-xl rounded-bl-xs bg-muted/50 border border-border overflow-hidden">
         <AIThinkingPanel
@@ -223,8 +236,8 @@ export function ChatInterface() {
                 className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {message.role === 'assistant' && (
-                  <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Sparkles className="size-4 text-white" />
+                  <div className="size-8 rounded-lg bg-foreground flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Sparkles className="size-4 text-background" />
                   </div>
                 )}
 
@@ -233,16 +246,16 @@ export function ChatInterface() {
                 }`}>
                   <div className={`px-3 py-2 w-full ${
                     message.role === 'user'
-                      ? 'rounded-tl-xl rounded-tr-xl rounded-br-xs rounded-bl-xl bg-[#23233d]/90 text-white dark:bg-[#fafafa] dark:text-black'
+                      ? 'rounded-tl-xl rounded-tr-xl rounded-br-xs rounded-bl-xl bg-[#262626]/90 text-white dark:bg-[#fafafa] dark:text-black'
                       : message.isError
-                      ? 'rounded-tl-xl rounded-tr-xl rounded-br-xl rounded-bl-xs border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/30'
+                      ? 'rounded-tl-xl rounded-tr-xl rounded-br-xl rounded-bl-xs border border-border bg-muted'
                       : 'rounded-tl-xl rounded-tr-xl rounded-br-xl rounded-bl-xs bg-muted/50 border border-border'
                   }`}>
 
                     {message.isError ? (
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="size-4 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
-                        <p className="text-sm text-rose-700 dark:text-rose-300 leading-relaxed">
+                        <AlertCircle className="size-4 text-foreground shrink-0 mt-0.5" />
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
                           {message.content}
                         </p>
                       </div>
@@ -289,10 +302,13 @@ export function ChatInterface() {
                           quarter={messageQuarter}
                           // Auto-start generation only for a message that
                           // just arrived (fresh timestamp) — restored
-                          // history must never fire background generations.
+                          // history must never fire background generations,
+                          // and upload follow-ups wait for the user's click
+                          // (presentationAutoStart === false).
                           autoStart={
                             isLastAssistant &&
                             !message.downloadUrl &&
+                            message.presentationAutoStart !== false &&
                             Date.now() - new Date(message.timestamp).getTime() < 60_000
                           }
                           messageId={message.id}
@@ -414,7 +430,7 @@ export function ChatInterface() {
               onClick={() => fileInputRef.current?.click()}
               disabled={isProcessing}
               aria-label="Upload a research file or report"
-              title="Upload a report (CSV, JSON, TXT, Markdown)"
+              title="Upload a report (CSV, JSON, TXT, Markdown, PDF)"
               className="shrink-0 rounded-full text-muted-foreground hover:text-foreground"
             >
               <Plus className="size-4" />

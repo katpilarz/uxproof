@@ -61,6 +61,9 @@ export interface Message extends AssistantMessageMeta {
   role:      'user' | 'assistant';
   content:   string;
   timestamp: Date;
+  /** false = presentation card renders idle and waits for the user's click
+   *  (upload follow-ups); undefined/true = fresh messages may auto-start. */
+  presentationAutoStart?: boolean;
   attachments?: {
     name: string;
     type: string;

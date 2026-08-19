@@ -100,12 +100,25 @@ def _norm_report(r: dict) -> NormalisedReport:
         participants      = int(r.get("participants", 0)),
         error_rate        = float(r.get("errorRate", 0)),
         conversion_rate   = float(r.get("conversionRate", 0)),
-        kpis     = [NormalisedKPI(**{k: v for k, v in kpi.items() if k != "_key"})
-                    for kpi in r.get("kpis", [])],
-        issues   = [NormalisedIssue(**{k: v for k, v in issue.items() if k != "_key"})
-                    for issue in r.get("issues", [])],
-        insights = [NormalisedInsight(**{k: v for k, v in ins.items() if k != "_key"})
-                    for ins in r.get("insights", [])],
+        # `or []` + per-field defaults: uploaded reports may lack these
+        # arrays entirely, and model-extracted entries may omit subfields.
+        kpis     = [NormalisedKPI(
+                        label=kpi.get("label") or "",
+                        value=str(kpi.get("value") or ""),
+                        change=float(kpi.get("change") or 0),
+                        trend=kpi.get("trend") or "stable")
+                    for kpi in (r.get("kpis") or [])],
+        issues   = [NormalisedIssue(
+                        title=issue.get("title") or "",
+                        severity=issue.get("severity") or "medium",
+                        description=issue.get("description") or "",
+                        recommendation=issue.get("recommendation") or "")
+                    for issue in (r.get("issues") or [])],
+        insights = [NormalisedInsight(
+                        category=ins.get("category") or "usability",
+                        title=ins.get("title") or "",
+                        summary=ins.get("summary") or "")
+                    for ins in (r.get("insights") or [])],
     )
 
 
@@ -155,32 +168,34 @@ class ContextAgent:
         mode: str = "single",   # single | year | comparison | all
         comparison_quarter: str | None = None,
         comparison_year: int | None = None,
+        user_id: str | None = None,   # scope every fetch to this owner
     ) -> dict:
         """
         Returns AIContextPayload as a plain dict (JSON-serialisable).
         """
         payload = await self._resolve(query, quarter, year, mode,
-                                      comparison_quarter, comparison_year)
+                                      comparison_quarter, comparison_year,
+                                      user_id)
         return asdict(payload)
 
     async def _resolve(self, query, quarter, year, mode,
-                       comp_q, comp_y) -> AIContextPayload:
+                       comp_q, comp_y, user_id=None) -> AIContextPayload:
 
         # ── All ───────────────────────────────────────────────────────────────
         if mode == "all" or "all" in query.lower():
-            reports = [_norm_report(r) for r in await fetch_all_reports()]
+            reports = [_norm_report(r) for r in await fetch_all_reports(user_id)]
             return AIContextPayload(
                 mode="all", period="All Available Periods",
                 primary=None, comparison=None,
                 all_reports=reports,
                 aggregated=_aggregate(reports),
                 delta=None,
-                metadata={"report_count": len(reports)},
+                metadata={"report_count": len(reports), "user_id": user_id},
             )
 
         # ── Year ──────────────────────────────────────────────────────────────
         if mode == "year" and year:
-            raws = await fetch_reports_by_year(year)
+            raws = await fetch_reports_by_year(year, user_id)
             reports = [_norm_report(r) for r in raws]
             return AIContextPayload(
                 mode="year", period=f"Full Year {year}",
@@ -188,14 +203,14 @@ class ContextAgent:
                 all_reports=reports,
                 aggregated=_aggregate(reports),
                 delta=None,
-                metadata={"year": year},
+                metadata={"year": year, "user_id": user_id},
             )
 
         # ── Comparison ────────────────────────────────────────────────────────
         if mode == "comparison" and quarter and year and comp_q and comp_y:
             raw_p, raw_c = await asyncio.gather(
-                fetch_report(quarter, year),
-                fetch_report(comp_q, comp_y),
+                fetch_report(quarter, year, user_id),
+                fetch_report(comp_q, comp_y, user_id),
             )
             p = _norm_report(raw_p) if raw_p else None
             c = _norm_report(raw_c) if raw_c else None
@@ -206,20 +221,20 @@ class ContextAgent:
                 all_reports=[r for r in [p, c] if r],
                 aggregated=_aggregate([r for r in [p, c] if r]),
                 delta=_delta(p, c) if p and c else None,
-                metadata={"comparison_period": f"{comp_q} {comp_y}"},
+                metadata={"comparison_period": f"{comp_q} {comp_y}", "user_id": user_id},
             )
 
         # ── Single (default) ──────────────────────────────────────────────────
         q  = quarter or "Q1"
         yr = year    or 2026
-        raw = await fetch_report(q, yr)
+        raw = await fetch_report(q, yr, user_id)
         p   = _norm_report(raw) if raw else None
 
         # Auto-fetch previous quarter for delta
         qmap = {"Q1": ("Q4", yr - 1), "Q2": ("Q1", yr),
                 "Q3": ("Q2", yr),     "Q4": ("Q3", yr)}
         prev_q, prev_y = qmap.get(q, ("Q4", yr - 1))
-        raw_c  = await fetch_report(prev_q, prev_y)
+        raw_c  = await fetch_report(prev_q, prev_y, user_id)
         c      = _norm_report(raw_c) if raw_c else None
 
         return AIContextPayload(
@@ -229,5 +244,5 @@ class ContextAgent:
             all_reports=[r for r in [p, c] if r],
             aggregated=_aggregate([p] if p else []),
             delta=_delta(p, c) if p and c else None,
-            metadata={"prev_period": f"{prev_q} {prev_y}"},
+            metadata={"prev_period": f"{prev_q} {prev_y}", "user_id": user_id},
         )

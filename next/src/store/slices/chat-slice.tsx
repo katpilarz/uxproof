@@ -40,11 +40,15 @@ export interface ChatSliceState {
   error:             string | null;
   selectedProjectId: string | null;
   streamSteps:       Record<string, { status: string; duration_ms?: number }>;
+  /** Prompt handed over from another page (e.g. /files CTAs) — consumed by
+   *  ChatInterface on mount and sent automatically in the fresh session. */
+  pendingPrompt:     string | null;
 }
 
 export interface ChatSliceActions {
   sendMessage:          (message: string, sessionId: string, context?: Partial<AIContext>) => Promise<void>;
   uploadFile:           (file: File) => Promise<void>;
+  setPendingPrompt:     (prompt: string | null) => void;
   resetChat:            () => void;
   setMessages:          (messages: Message[]) => void;
   setView:              (view: 'chat' | 'dashboard') => void;
@@ -76,6 +80,7 @@ const initialState: ChatSliceState = {
   error:             null,
   selectedProjectId: null,
   streamSteps:       {},
+  pendingPrompt:     null,
 };
 
 // ─── SSE stream reader ────────────────────────────────────────────────────────
@@ -172,6 +177,8 @@ export const createChatSlice: StateCreator<
 > = (set, get) => ({
   ...initialState,
 
+  setPendingPrompt: (prompt) => set(s => { s.pendingPrompt = prompt; }),
+
   /**
    * Upload a research file/report through the chat "+" button. Mirrors
    * sendMessage's shape: optimistic user message with the attachment,
@@ -220,6 +227,28 @@ export const createChatSlice: StateCreator<
           content:   data.assistantMessage?.content || `Stored ${file.name} in your files.`,
           timestamp: new Date(makeTimestamp()),
         });
+        // Second assistant turn: with extracted data it carries the
+        // presentation card (idle — generation runs on the user's click);
+        // otherwise a next-steps hint for reference-only files.
+        if (data.followUpMessage?.content) {
+          const fu = data.followUpMessage;
+          s.messages.push({
+            id:        makeMsgId(),
+            role:      'assistant',
+            content:   fu.content,
+            timestamp: new Date(makeTimestamp()),
+            ...(fu.showPresentation ? {
+              showPresentation:      true,
+              presentationScope:     fu.presentationScope,
+              quarter:               fu.quarter,
+              year:                  fu.year,
+              contextRef:            fu.contextQuarter
+                ? { project: 'UX Research Report', quarter: fu.contextQuarter }
+                : undefined,
+              presentationAutoStart: false,
+            } : {}),
+          });
+        }
       });
       get().showToast(
         data.reportsCreated?.length

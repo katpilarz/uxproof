@@ -202,7 +202,7 @@ export function ChatHistorySidebar() {
                           className={cn(
                             'w-full max-w-full text-left pl-2.5 pr-8 py-2 rounded-lg border transition-colors duration-150 overflow-hidden',
                             isActive
-                              ? 'bg-violet-500/10 border-violet-500/40'
+                              ? 'bg-muted border-foreground/30'
                               : 'bg-transparent border-transparent hover:bg-muted/60',
                           )}
                         >
@@ -211,7 +211,7 @@ export function ChatHistorySidebar() {
                             className={cn(
                               'text-xs truncate leading-snug',
                               isActive
-                                ? 'text-violet-700 dark:text-violet-300 font-medium'
+                                ? 'text-foreground font-medium'
                                 : 'text-foreground',
                             )}
                           >
@@ -238,7 +238,7 @@ export function ChatHistorySidebar() {
                           title="Delete conversation"
                           className={cn(
                             'absolute right-1.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md',
-                            'text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-colors',
+                            'text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors',
                             'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                           )}
                         >

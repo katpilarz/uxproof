@@ -62,6 +62,7 @@ interface OrchestratorTriggerArgs {
   mode:     'year' | 'single';
   year?:    number;
   quarter?: string;
+  userId?:  string;   // scopes the pipeline's report fetches + year-plan id
 }
 
 /**
@@ -89,6 +90,7 @@ async function triggerOrchestrator(args: OrchestratorTriggerArgs): Promise<boole
         mode:    args.mode,
         year:    args.year,
         quarter: args.quarter,
+        user_id: args.userId,
         // Always ask for the planning agent to run; the orchestrator
         // skips it by default for "just analyse" calls.
         agents_requested: ['planning'],
@@ -97,6 +99,12 @@ async function triggerOrchestrator(args: OrchestratorTriggerArgs): Promise<boole
     });
     if (!res.ok) {
       console.warn('[presentations] orchestrator non-200:', res.status, await res.text().catch(() => ''));
+      return false;
+    }
+    // A 200 can still carry a failed pipeline — check the body's status.
+    const data = await res.json().catch(() => null);
+    if (data && data.status !== 'completed') {
+      console.warn('[presentations] orchestrator pipeline failed:', data.status, data.error ?? '');
       return false;
     }
     return true;
@@ -168,16 +176,18 @@ export async function POST(request: NextRequest) {
       reportId, quarter, year, slidePlanId, scope,
     });
 
-    // ── 1. Fetch the slidePlan from Sanity ────────────────────────────────
+    // ── 1. Fetch the slidePlan from Sanity — scoped to the signed-in
+    //       user, so a stale/foreign report for the same period can never
+    //       supply the deck's data.
     let plan: any = null;
     if (slidePlanId) {
       plan = await getSlidePlanById(slidePlanId);
     } else if (scope === 'year' && year) {
-      plan = await getSlidePlanForYear(year);
+      plan = await getSlidePlanForYear(year, user.id);
     } else if (reportId) {
       plan = await getSlidePlan(reportId);
     } else if (quarter && year) {
-      plan = await getSlidePlanForPeriod(quarter, year);
+      plan = await getSlidePlanForPeriod(quarter, year, user.id);
     } else if (legacySlidePlan) {
       plan = legacySlidePlan;
     }
@@ -198,15 +208,17 @@ export async function POST(request: NextRequest) {
     // For year-scope: we ONLY trigger if no *_year_<year>* plan exists.
     // The latest-quarter fallback from getSlidePlanForYear is silently
     // discarded so we don't ship a misleading "year" deck.
-    const needsYearPlan    = scope === 'year' && year && (!plan || plan._id !== `slideplan_year_${year}`);
-    const needsQuarterPlan = !!(quarter && year && !plan);
+    const expectedYearPlanId = `slideplan_year_${year}_${user.id.replace(/^user_/, '')}`;
+    const needsYearPlan      = scope === 'year' && year && (!plan || plan._id !== expectedYearPlanId);
+    const needsQuarterPlan   = !!(quarter && year && !plan);
 
     if (needsYearPlan) {
       console.log(`[presentations] no year-scope plan for ${year}; triggering orchestrator`);
-      const ok = await triggerOrchestrator({ mode: 'year', year });
+      const ok = await triggerOrchestrator({ mode: 'year', year, userId: user.id });
       if (ok) {
-        // Re-fetch — orchestrator should have persisted slideplan_year_<year>
-        plan = await getSlidePlanForYear(year);
+        // Re-fetch — orchestrator should have persisted the user-scoped
+        // slideplan_year_<year>_<userSuffix>
+        plan = await getSlidePlanForYear(year, user.id);
         console.log('[presentations] post-orchestrator plan _id:', plan?._id);
       } else if (!plan) {
         // Orchestrator failed AND there was no fallback — render defaults
@@ -215,9 +227,9 @@ export async function POST(request: NextRequest) {
       }
     } else if (needsQuarterPlan) {
       console.log(`[presentations] no plan for ${quarter} ${year}; triggering orchestrator`);
-      const ok = await triggerOrchestrator({ mode: 'single', quarter, year });
+      const ok = await triggerOrchestrator({ mode: 'single', quarter, year, userId: user.id });
       if (ok) {
-        plan = await getSlidePlanForPeriod(quarter!, year!);
+        plan = await getSlidePlanForPeriod(quarter!, year!, user.id);
       }
     }
 

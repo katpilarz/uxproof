@@ -37,8 +37,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createUnifiedAI } from '@/lib/agents/unified-agent';
 import { AIContext } from '@/types';
-import { createChatSession, appendMessageToSession, countUserFiles } from '@/lib/sanity';
+import { createChatSession, appendMessageToSession, countUserFiles, getUserFileByName } from '@/lib/sanity';
 import { countUserReports } from '@/lib/services/report-query';
+import { aiDocumentSummary, fallbackTextSummary } from '@/lib/file-analysis';
 import { getCurrentUser } from '@/lib/auth';
 
 const AGENT_SERVICE = process.env.AGENT_SERVICE_URL || 'http://localhost:8001';
@@ -139,8 +140,22 @@ async function conversationalize(
 
 // ─── Intent classification ────────────────────────────────────────────────────
 
-function classifyMessage(message: string): 'casual' | 'presentation' | 'deep' | 'data' {
+/** Pull a filename (with a supported extension) out of a chat message.
+ *  Names containing spaces must be quoted (the /files CTA always quotes). */
+function extractFilename(message: string): string | null {
+  const quoted = message.match(/["“”']([^"“”']+\.(?:pdf|txt|md|markdown|csv|json))["“”']/i);
+  if (quoted) return quoted[1].trim();
+  const bare = message.match(/(\S+\.(?:pdf|txt|md|markdown|csv|json))(?=\s|$|[?!.,])/i);
+  return bare ? bare[1].trim() : null;
+}
+
+function classifyMessage(message: string): 'casual' | 'presentation' | 'deep' | 'data' | 'file-summary' {
   const lower = message.toLowerCase().trim();
+
+  // "Summarize the file lumen.pdf" — the active prompt from /files (also
+  // works typed by hand). Must win over the 'deep' summarise match.
+  if (/\bsummar(y|ise|ize)\b/i.test(lower) && extractFilename(message)) return 'file-summary';
+
   const hasData = /\b(q[1-4]|quarter|sus|nps|task success|error rate|conversion|participant|usability|kpi|metric|issue|finding|insight|report|research|performance|compare|versus|year|annual|2[0-9]{3}|h[12]|half|analyse|analyze|analysis|overview|summary|accessib)\b/i.test(message);
 
   if (!hasData) {
@@ -172,12 +187,40 @@ function casualReply(message: string): string {
     return `Hello! I'm the **uxproof research assistant**.\n\nI can help you with:\n\n• **Analyse a quarter** — _"Analyse Q3 2025"_ or _"What is the SUS score for Q4 2025?"_\n• **Compare periods** — _"Compare Q3 vs Q4 2025"_\n• **Full year overviews** — _"Full year 2025 overview"_\n• **Generate presentations** — _"Generate Q4 2025 presentation"_ or _"Generate 2025 presentation"_\n• **Deep AI analysis** — _"Deep analysis Q3 2025"_\n\nWhat would you like to explore?`;
   }
   if (/how (can|do) you help/.test(q) || /what can you do/.test(q) || /^help\b/.test(q)) {
-    return `I'm the **uxproof research assistant** — I turn **your uploaded** UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Summarize research files you upload with the **+** button (CSV, JSON, TXT, Markdown)\n• Query SUS, task success, NPS, error-rate and conversion data from your uploaded quarters\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• Upload a report via **+**, then _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
+    return `I'm the **uxproof research assistant** — I turn **your uploaded** UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Summarize research files you upload with the **+** button (CSV, JSON, TXT, Markdown, PDF)\n• Query SUS, task success, NPS, error-rate and conversion data from your uploaded quarters\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• Upload a report via **+**, then _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
   }
   if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Generate Q4 2025 presentation"_ or _"Analyse Q3 2025"_`;
   if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse Q3 2025"_`;
   if (/^(thanks|thank you)/.test(q)) return `You're welcome! Let me know if you need any other analysis or a presentation.`;
   return `I can help you analyse UX research data and generate presentations. Try: _"Analyse Q3 2025"_`;
+}
+
+/**
+ * After a file upload, the assistant automatically offers: "Would you like
+ * me to generate a presentation from this data?" A bare affirmation ("yes",
+ * "sure", "go ahead") in reply must become the real generation request —
+ * otherwise it would classify as casual chat. Resolution: if the message is
+ * an affirmation AND the latest assistant turn contains that offer, rewrite
+ * it to "Generate <period> presentation" using the most recent period
+ * mentioned in the conversation.
+ */
+function resolveAffirmativeFollowUp(message: string, history: HistoryTurn[]): string {
+  const q = message.toLowerCase().trim();
+  const isAffirmation =
+    /^(yes( please)?|yep|yeah|sure|ok(ay)?|please( do)?|go ahead|do it|generate( it| one)?|sounds good|why not)[.! ]*$/.test(q);
+  if (!isAffirmation) return message;
+
+  // Only the immediately preceding assistant turn counts as the offer.
+  const lastAssistant = [...history].reverse().find(h => h.role === 'assistant');
+  if (!lastAssistant || !/generate a presentation/i.test(lastAssistant.content)) return message;
+
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m =
+      history[i].content.match(/\bQ[1-4]\s*20\d{2}\b/i) ||
+      history[i].content.match(/\b20\d{2}\b/);
+    if (m) return `Generate ${m[0]} presentation`;
+  }
+  return 'Generate presentation';
 }
 
 /**
@@ -277,7 +320,7 @@ function formatIntelligence(
 
 // ─── Agent-pipeline call (deep intent only) ───────────────────────────────────
 
-async function callAgentPipeline(message: string) {
+async function callAgentPipeline(message: string, userId: string) {
   const { quarter, year } = extractPeriod(message);
 
   const t0  = Date.now();
@@ -288,7 +331,8 @@ async function callAgentPipeline(message: string) {
       task:    message,
       // Deep analysis uses 'single' mode — the orchestrator returns
       // intelligence for one quarter with delta vs previous quarter.
-      context: { quarter, year, mode: 'single' },
+      // user_id scopes the pipeline's report fetches to this owner.
+      context: { quarter, year, mode: 'single', user_id: userId },
       agents:  ['context', 'extraction'],
     }),
     signal: AbortSignal.timeout(200_000),
@@ -364,8 +408,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Follow-ups inherit the last-mentioned period from history.
-    const resolvedMessage     = resolvePeriodFromHistory(message, history);
+    // "Yes" after the upload follow-up becomes the actual presentation
+    // request; other follow-ups inherit the last-mentioned period.
+    const affirmedMessage     = resolveAffirmativeFollowUp(message, history);
+    const resolvedMessage     = resolvePeriodFromHistory(affirmedMessage, history);
     const intent              = classifyMessage(resolvedMessage);
     const { quarter, year }   = extractPeriod(resolvedMessage);
     const scope               = detectScope(resolvedMessage);
@@ -395,8 +441,8 @@ export async function POST(request: NextRequest) {
         const uploadPrompt =
           `I don't have any research data for you yet — my answers are based entirely on **what you upload**.\n\n` +
           `Click the **+** button next to the chat input to upload a report:\n\n` +
-          `• **CSV or JSON** with \`quarter\`, \`year\` and \`susScore\` (plus any of task success, NPS, error rate, participants, issues, insights) — becomes queryable research data for analyses and presentation decks\n` +
-          `• **TXT or Markdown** — kept as reference context and summarized\n\n` +
+          `• **CSV or JSON** with \`quarter\`, \`year\` and \`susScore\` columns — parsed directly\n` +
+          `• **PDF, TXT or Markdown** — I'll summarize it and **extract the research data automatically**\n\n` +
           `Once uploaded, ask me again${/\bq[1-4]|20\d{2}/i.test(message) ? ` about ${message.match(/\b(?:Q[1-4]\s*)?20\d{2}\b|\bQ[1-4]\b/i)?.[0] ?? 'that period'}` : ''}.`;
         if (sessionId) {
           try {
@@ -446,11 +492,39 @@ export async function POST(request: NextRequest) {
       contextRefOverride = response.contextRef;
       agentInfo          = response.agentInfo || { agent: 'uxproof assistant', processingTime: '—' };
 
+    } else if (intent === 'file-summary') {
+      // "Summarize the file <name>" — the active prompt from /files. Runs a
+      // fresh grounded summary of the stored document text (with [page N]
+      // citations for PDFs); falls back to the stored summary, then the
+      // deterministic one, when Ollama is unavailable.
+      const filename = extractFilename(message)!;
+      const t0  = Date.now();
+      const doc = await getUserFileByName(user.id, filename);
+      if (!doc) {
+        responseContent = `I couldn't find **${filename}** in your files. Check the **Files** page for the exact name, or upload it with the **+** button.`;
+        agentInfo       = { agent: 'uxproof assistant', processingTime: '0.0s' };
+      } else {
+        const fresh = doc.textContent
+          ? await aiDocumentSummary(doc.filename, doc.textContent)
+          : null;
+        responseContent = fresh
+          ?? doc.summary
+          ?? (doc.textContent
+                ? fallbackTextSummary(doc.filename, doc.textContent)
+                : `**${doc.filename}** has no stored text to summarize.`);
+        agentInfo = {
+          agent:          fresh ? `uxproof assistant · ${OLLAMA_MODEL}` : 'uxproof assistant',
+          processingTime: `${((Date.now() - t0) / 1000).toFixed(1)}s`,
+        };
+      }
+      processingType     = 'analysis';
+      contextRefOverride = undefined;
+
     } else if (intent === 'deep') {
       // Deep analysis still uses the agent pipeline + the full-report formatter —
       // that's what the user explicitly asked for ("deep analysis…",
       // "full report…", "executive summary…").
-      const result     = await callAgentPipeline(resolvedMessage);
+      const result     = await callAgentPipeline(resolvedMessage, user.id);
       responseContent  = result.content;
       intelligence     = result.intelligence;
       processingType   = 'analysis';

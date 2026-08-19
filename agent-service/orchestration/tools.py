@@ -24,10 +24,12 @@ async def tool_build_context(
     mode: str = "single",
     comparison_quarter: str | None = None,
     comparison_year: int | None = None,
+    user_id: str | None = None,
 ) -> dict:
     """
     Retrieves and normalises enterprise data from Sanity CMS.
-    Returns a deterministic AIContextPayload dict.
+    Returns a deterministic AIContextPayload dict. When user_id is given,
+    every report fetch is scoped to that owner.
     """
     return await _ctx.build_context(
         query=query,
@@ -36,6 +38,7 @@ async def tool_build_context(
         mode=mode,
         comparison_quarter=comparison_quarter,
         comparison_year=comparison_year,
+        user_id=user_id,
     )
 
 

@@ -57,6 +57,7 @@ class CoordinatorAgent:
                 quarter=context.get("quarter") if context else None,
                 year=context.get("year")       if context else None,
                 mode=context.get("mode", "single") if context else "single",
+                user_id=context.get("user_id") if context else None,
             )
 
             ctx_step.complete(
@@ -149,6 +150,7 @@ class CoordinatorAgent:
                 quarter=context.get("quarter") if context else None,
                 year=context.get("year")       if context else None,
                 mode=context.get("mode", "single") if context else "single",
+                user_id=context.get("user_id") if context else None,
             )
 
             ctx_step.complete(
