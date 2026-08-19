@@ -3,7 +3,7 @@
  *
  * Renders the fixed 8-slide uxproof deck from a Sanity slidePlan:
  *
- *   1. Cover            — period + report title, grayscale cover photo right
+ *   1. Cover            — period + report title, full-colour cover photo right
  *   2. Headline Score   — hero SUS value on black, 4 KPI cards
  *   3. Usability Trend  — SUS / task-success line chart, black side panel
  *   4. UX Indicators    — 8 KPI cards on white

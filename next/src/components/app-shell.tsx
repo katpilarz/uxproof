@@ -16,9 +16,12 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { TopBar }             from '@/components/top-bar';
 import { SettingsDialog }     from '@/components/settings-dialog';
 import { ChatHistorySidebar } from '@/components/chat-history-sidebar';
+import { LoginScreen }        from '@/components/login-screen';
+import { Toaster }            from '@/components/toaster';
 
 import {
   useSettingsOpen,
@@ -28,11 +31,15 @@ import {
   useCloseHistory,
   useOpenSettings,
   useCloseSettings,
+  useAuthUser,
+  useAuthLoading,
 } from '@/store';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router       = useRouter();
   const settingsOpen = useSettingsOpen();
+  const user         = useAuthUser();
+  const authLoading  = useAuthLoading();
 
   const newSession   = useNewSession();
   const historyOpen  = useHistoryOpen();
@@ -55,8 +62,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push('/presentations');
   };
 
+  // Auth gate: wait for the boot-time /api/auth/me check, then either show
+  // the login screen or the app. The Toaster renders in every branch so
+  // sign-in/out confirmations are never swallowed by the swap.
+  if (authLoading) {
+    return (
+      <div className="h-screen w-full grid place-items-center bg-background">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <LoginScreen />
+        <Toaster />
+      </>
+    );
+  }
+
   return (
     <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
+      <Toaster />
       <TopBar
         onDashboardClick={handleDashboardClick}
         onLogoClick={handleLogoClick}

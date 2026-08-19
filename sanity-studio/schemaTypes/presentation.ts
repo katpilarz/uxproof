@@ -4,6 +4,12 @@ export default {
   type: 'document',
   fields: [
     { name: 'presentationId', title: 'Presentation ID', type: 'string' },
+    {
+      name: 'user',
+      title: 'Owner',
+      type: 'reference',
+      to: [{ type: 'user' }],
+    },
     { name: 'title', title: 'Presentation Title', type: 'string' },
     { name: 'slidesCount', title: 'Number of Slides', type: 'number' },
     {

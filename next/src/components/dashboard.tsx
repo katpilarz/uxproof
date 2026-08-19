@@ -1,118 +1,110 @@
+'use client';
+
+/**
+ * components/dashboard.tsx — v2 (real data)
+ *
+ * CHANGES OVER v1:
+ *   The grid used to render a hardcoded demo array. It now lists the
+ *   signed-in user's actual generated decks from GET /api/presentations
+ *   (Sanity `presentation` documents carrying a user reference), with the
+ *   stat cards computed from the same data. Download opens the stored
+ *   downloadUrl; decks generated before the last server restart may have
+ *   expired since /downloads files are ephemeral.
+ */
+
+import { useEffect, useState } from 'react';
 import {
   FileText,
   Download,
-  Eye,
   Calendar,
   BarChart,
   Layers,
-  ArrowUpRight,
+  Loader2,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { Presentation } from '@/types';
 import PowerPointIcon from './ui/powerpoint-icon';
 
 type DashboardProps = {
   onChatClick: () => void;
 };
 
+interface PresentationRow {
+  _id:           string;
+  title?:        string;
+  quarter?:      string;
+  slidesCount?:  number;
+  status?:       string;
+  downloadUrl?:  string;
+  generatedDate?: string;
+}
+
+const GRADIENTS = [
+  'from-purple-600 to-blue-500',
+  'from-orange-400 to-pink-400',
+  'from-cyan-400 to-indigo-600',
+  'from-blue-400 to-emerald-400',
+  'from-pink-300 to-purple-600',
+  'from-sky-300 to-blue-600',
+  'from-rose-400 to-fuchsia-600',
+  'from-indigo-400 to-cyan-500',
+];
+
+function gradientFor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  return GRADIENTS[Math.abs(hash) % GRADIENTS.length];
+}
+
+function isThisCalendarQuarter(iso?: string): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() &&
+         Math.floor(d.getMonth() / 3) === Math.floor(now.getMonth() / 3);
+}
+
 export function Dashboard({ onChatClick }: DashboardProps) {
-  const presentations: Presentation[] = [
-    {
-      id: '1',
-      title: 'Aurelo Q1 2026 UX Report',
-      quarter: 'Q3 2024',
-      generatedDate: new Date('2024-10-15'),
-      slides: 24,
-      thumbnail: 'gradient-violet',
-      status: 'completed',
-    },
-    {
-      id: '2',
-      title: 'Q3 vs Q4 2025 Comparison',
-      quarter: 'Q3 2024',
-      generatedDate: new Date('2024-10-10'),
-      slides: 18,
-      thumbnail: 'gradient-sunset',
-      status: 'completed',
-    },
-    {
-      id: '3',
-      title: 'Checkout Usability Deep Dive',
-      quarter: 'Q3 2024',
-      generatedDate: new Date('2024-10-08'),
-      slides: 32,
-      thumbnail: 'gradient-teal',
-      status: 'completed',
-    },
-    {
-      id: '4',
-      title: 'Accessibility Audit Overview',
-      quarter: 'Q2 2024',
-      generatedDate: new Date('2024-07-20'),
-      slides: 15,
-      thumbnail: 'gradient-mint',
-      status: 'completed',
-    },
-    {
-      id: '5',
-      title: 'Full Year 2025 Research Review',
-      quarter: 'Q3 2024',
-      generatedDate: new Date('2024-09-25'),
-      slides: 28,
-      thumbnail: 'gradient-pink',
-      status: 'completed',
-    },
-  ];
+  const [presentations, setPresentations] = useState<PresentationRow[]>([]);
+  const [loading,       setLoading]       = useState(true);
 
-  const gradientMap: Record<string, string> = {
-    'gradient-violet': 'from-purple-600 to-blue-500',
-    'gradient-blue': 'from-sky-300 to-blue-600',
-    'gradient-indigo': 'from-fuchsia-400 to-violet-600',
-    'gradient-slate': 'from-indigo-400 to-cyan-500',
-    'gradient-pink': 'from-pink-300 to-purple-600',
-    'gradient-teal': 'from-cyan-400 to-indigo-600',
-    'gradient-rose': 'from-rose-400 to-fuchsia-600',
-    'gradient-ice': 'from-slate-300 to-sky-500',
-    'gradient-marine': 'from-blue-400 to-cyan-100',
-    'gradient-sunset': 'from-orange-400 to-pink-400',
-    'gradient-mint': 'from-blue-400 to-emerald-400',
-    'gradient-sky': 'from-sky-200 to-indigo-200',
-  };
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/presentations', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : { presentations: [] }))
+      .then(data => {
+        if (!cancelled) setPresentations(data.presentations || []);
+      })
+      .catch(e => console.warn('[dashboard] failed to load presentations:', e))
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
-  // Total slides across all presentations
-  const totalSlides = presentations.reduce((sum, p) => sum + p.slides, 0);
+  const totalSlides    = presentations.reduce((sum, p) => sum + (p.slidesCount ?? 0), 0);
+  const thisQuarter    = presentations.filter(p => isThisCalendarQuarter(p.generatedDate)).length;
+  const distinctPeriods = new Set(presentations.map(p => p.quarter).filter(Boolean)).size;
 
   const stats = [
     {
       label: 'Total Presentations',
-      value: '12',
+      value: String(presentations.length),
       icon: FileText,
-      // Violet accent — primary action metric
-      iconBg: 'bg-violet-500/10',
-      iconColor: 'text-violet-600 dark:text-violet-400',
     },
     {
       label: 'This Quarter',
-      value: '4',
+      value: String(thisQuarter),
       icon: Calendar,
-      iconBg: 'bg-violet-500/10',
-      iconColor: 'text-violet-600 dark:text-violet-400',
     },
     {
-      label: 'Reports Analyzed',
-      value: '28',
+      label: 'Periods Covered',
+      value: String(distinctPeriods),
       icon: BarChart,
-      iconBg: 'bg-violet-500/10',
-      iconColor: 'text-violet-600 dark:text-violet-400',
     },
     {
       label: 'Slides Generated',
       value: String(totalSlides),
       icon: Layers,
-      iconBg: 'bg-violet-500/10',
-      iconColor: 'text-violet-600 dark:text-violet-400',
     },
   ];
 
@@ -123,7 +115,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
         <div className="mb-8">
           <h1 className="mb-2 display text-3xl">Generated Presentations</h1>
           <p className="text-muted-foreground">
-            AI-generated UX research presentations from your quarterly study data
+            Your AI-generated UX research presentations from quarterly study data
           </p>
         </div>
 
@@ -137,9 +129,11 @@ export function Dashboard({ onChatClick }: DashboardProps) {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                  <p className="text-3xl font-semibold">{stat.value}</p>
+                  <p className="text-3xl font-semibold">
+                    {loading ? '—' : stat.value}
+                  </p>
                 </div>
-                <div className={`size-10 rounded-lg flex items-center justify-center ${stat.iconBg} ${stat.iconColor}`}>
+                <div className="size-10 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-600 dark:text-violet-400">
                   <stat.icon className="size-5" />
                 </div>
               </div>
@@ -147,126 +141,135 @@ export function Dashboard({ onChatClick }: DashboardProps) {
           ))}
         </div>
 
+        {loading && (
+          <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            <span className="text-sm">Loading your presentations…</span>
+          </div>
+        )}
+
         {/* Presentations Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {presentations.map((presentation) => (
-            <Card
-              key={presentation.id}
-              className="group hover:shadow-lg transition-all duration-200 overflow-hidden border border-border bg-card"
-            >
-              <div
-                className={`h-40 bg-gradient-to-br ${gradientMap[presentation.thumbnail]} relative flex items-center justify-center`}
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {presentations.map((presentation) => (
+              <Card
+                key={presentation._id}
+                className="group hover:shadow-lg transition-all duration-200 overflow-hidden border border-border bg-card"
               >
-                <PowerPointIcon
-                  className="opacity-100 my-auto mr-10 group-hover:opacity-30 transition-opacity duration-300"
-                  size={129}
-                  animate={true}
-                />
+                <div
+                  className={`h-40 bg-gradient-to-br ${gradientFor(presentation._id)} relative flex items-center justify-center`}
+                >
+                  <PowerPointIcon
+                    className="opacity-100 my-auto mr-10 group-hover:opacity-30 transition-opacity duration-300"
+                    size={129}
+                    animate={true}
+                  />
 
-                {/* Slide count pill */}
-                <div className="absolute top-4 right-4 z-20 transition-all duration-300 opacity-100 group-hover:opacity-30">
-                  <div className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1 text-white">
-                    <span className="text-sm font-medium">{presentation.slides} Slides</span>
+                  {/* Slide count pill */}
+                  <div className="absolute top-4 right-4 z-20 transition-all duration-300 opacity-100 group-hover:opacity-30">
+                    <div className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1 text-white">
+                      <span className="text-sm font-medium">{presentation.slidesCount ?? 8} Slides</span>
+                    </div>
                   </div>
+
+                  {/* Hover overlay */}
+                  {presentation.downloadUrl && (
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <Button size="sm" variant="secondary" asChild>
+                        <a href={presentation.downloadUrl} download>
+                          <Download className="size-4 mr-1" />
+                          Download
+                        </a>
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="secondary">
-                      <Eye className="size-4 mr-1" />
-                      Preview
-                    </Button>
-                    <Button size="sm" variant="secondary">
-                      <Download className="size-4 mr-1" />
-                      Download
-                    </Button>
+                <div className="px-5 pt-5 pb-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-medium mb-1 line-clamp-2">
+                        {presentation.title || 'UX Research Report'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">{presentation.quarter}</p>
+                    </div>
+                    <Badge
+                      variant={presentation.status === 'completed' ? 'default' : 'secondary'}
+                      className="ml-2"
+                    >
+                      {presentation.status ?? 'completed'}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="size-3" />
+                      <span>
+                        {presentation.generatedDate
+                          ? new Date(presentation.generatedDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : '—'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Card>
+            ))}
 
-              <div className="px-5 pt-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-medium mb-1 line-clamp-2">{presentation.title}</h3>
-                    <p className="text-sm text-muted-foreground">{presentation.quarter}</p>
+            {/* Add New — high-contrast card */}
+            <Card
+              className="overflow-hidden border-0 cursor-pointer group transition-all duration-200 hover:scale-[1.01] bg-[#0f0f1c] dark:bg-white"
+              onClick={() => onChatClick?.()}
+            >
+              <div className="h-full flex flex-col items-center justify-center text-center min-h-[280px] relative overflow-hidden">
+
+                {/* Decorative circles — clipped by overflow-hidden */}
+                <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-violet-500/15 dark:bg-violet-400/12 pointer-events-none" />
+                <div className="absolute -bottom-10 -left-10 w-36 h-36 rounded-full bg-violet-600/10 dark:bg-violet-500/8 pointer-events-none" />
+                <div className="absolute top-1/2 -translate-y-1/2 -right-6 w-20 h-20 rounded-full bg-white/4 dark:bg-black/4 pointer-events-none" />
+
+                {/* Content */}
+                <div className="relative z-10 flex flex-col items-center px-8">
+
+                  {/* Stacked slide icon */}
+                  <div className="relative mb-6 w-10 h-8">
+                    <div className="absolute -top-1 -left-1 w-10 h-8 rounded-md bg-white/15 dark:bg-black/10 rotate-[-8deg]" />
+                    <div className="absolute -top-0.5 left-0.5 w-10 h-8 rounded-md bg-white/20 dark:bg-black/14 rotate-[-3deg]" />
+                    <div className="relative w-10 h-8 rounded-md bg-white/90 dark:bg-[#0f0f1c]/90 flex items-center justify-center">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M7 1.5V12.5M1.5 7H12.5" stroke="#0f0f1c" strokeWidth="1.5" strokeLinecap="round" className="dark:stroke-white" />
+                      </svg>
+                    </div>
                   </div>
-                  <Badge
-                    variant={presentation.status === 'completed' ? 'default' : 'secondary'}
-                    className="ml-2"
+
+                  <h3 className="font-medium mb-2 text-white dark:text-[#0f0f1c]">
+                    {presentations.length === 0
+                      ? 'Generate Your First Presentation'
+                      : 'Generate New Presentation'}
+                  </h3>
+                  <p className="text-sm text-white/50 dark:text-[#0f0f1c]/50 mb-6 max-w-[190px]">
+                    Use the AI chat to create a new research presentation
+                  </p>
+
+                  {/* Pill CTA */}
+                  <div className="px-5 py-2 rounded-full text-xs font-medium tracking-wide
+                    bg-white/12 group-hover:bg-white/20
+                    dark:bg-black/8 dark:group-hover:bg-black/14
+                    text-white dark:text-[#0f0f1c]
+                    ring-1 ring-white/20 dark:ring-black/10
+                    transition-colors duration-200"
                   >
-                    {presentation.status}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="size-3" />
-                    <span>
-                      {presentation.generatedDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </span>
+                    Open Chat
                   </div>
-                  <Button variant="ghost" size="sm" className="h-auto p-0 text-xs hover:bg-transparent gap-1">
-                    View Details
-                    <ArrowUpRight className="size-3" />
-                  </Button>
+
                 </div>
               </div>
             </Card>
-          ))}
-
-          {/* Add New — high-contrast card */}
-          <Card
-            className="overflow-hidden border-0 cursor-pointer group transition-all duration-200 hover:scale-[1.01] bg-[#0f0f1c] dark:bg-white"
-            onClick={() => onChatClick?.()}
-          >
-            <div className="h-full flex flex-col items-center justify-center text-center min-h-[280px] relative overflow-hidden">
-
-              {/* Decorative circles — clipped by overflow-hidden */}
-              <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-violet-500/15 dark:bg-violet-400/12 pointer-events-none" />
-              <div className="absolute -bottom-10 -left-10 w-36 h-36 rounded-full bg-violet-600/10 dark:bg-violet-500/8 pointer-events-none" />
-              <div className="absolute top-1/2 -translate-y-1/2 -right-6 w-20 h-20 rounded-full bg-white/4 dark:bg-black/4 pointer-events-none" />
-
-              {/* Content */}
-              <div className="relative z-10 flex flex-col items-center px-8">
-
-                {/* Stacked slide icon */}
-                <div className="relative mb-6 w-10 h-8">
-                  <div className="absolute -top-1 -left-1 w-10 h-8 rounded-md bg-white/15 dark:bg-black/10 rotate-[-8deg]" />
-                  <div className="absolute -top-0.5 left-0.5 w-10 h-8 rounded-md bg-white/20 dark:bg-black/14 rotate-[-3deg]" />
-                  <div className="relative w-10 h-8 rounded-md bg-white/90 dark:bg-[#0f0f1c]/90 flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M7 1.5V12.5M1.5 7H12.5" stroke="#0f0f1c" strokeWidth="1.5" strokeLinecap="round" className="dark:stroke-white" />
-                    </svg>
-                  </div>
-                </div>
-
-                <h3 className="font-medium mb-2 text-white dark:text-[#0f0f1c]">
-                  Generate New Presentation
-                </h3>
-                <p className="text-sm text-white/50 dark:text-[#0f0f1c]/50 mb-6 max-w-[190px]">
-                  Use the AI chat to create a new research presentation
-                </p>
-
-                {/* Pill CTA */}
-                <div className="px-5 py-2 rounded-full text-xs font-medium tracking-wide
-                  bg-white/12 group-hover:bg-white/20
-                  dark:bg-black/8 dark:group-hover:bg-black/14
-                  text-white dark:text-[#0f0f1c]
-                  ring-1 ring-white/20 dark:ring-black/10
-                  transition-colors duration-200"
-                >
-                  Open Chat
-                </div>
-
-              </div>
-            </div>
-          </Card>
-        </div>
+          </div>
+        )}
 
       </div>
     </div>

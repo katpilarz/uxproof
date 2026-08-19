@@ -49,7 +49,9 @@ import {
   getSlidePlanForYear,
   logSlidePlanShape,
   savePresentation,
+  getPresentationsForUser,
 } from '@/lib/sanity';
+import { getCurrentUser } from '@/lib/auth';
 
 // ─── Orchestration trigger ────────────────────────────────────────────────────
 
@@ -115,8 +117,29 @@ async function ensureDownloadsDir() {
   try { await fs.mkdir(dir, { recursive: true }); } catch {}
 }
 
+// ─── GET — the signed-in user's generated presentations ──────────────────────
+
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ presentations: [], error: 'Not signed in' }, { status: 401 });
+  }
+  try {
+    const rows = await getPresentationsForUser(user.id);
+    return NextResponse.json({ presentations: rows || [] });
+  } catch (e) {
+    console.error('[presentations] GET error:', e);
+    return NextResponse.json({ presentations: [], error: String(e) }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   await ensureDownloadsDir();
+
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
+  }
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -246,7 +269,7 @@ export async function POST(request: NextRequest) {
       status:        'completed',
       downloadUrl:   result.downloadUrl,
       generatedDate: new Date().toISOString(),
-    }).catch(err => console.warn('[presentations] Sanity save failed (non-fatal):', err));
+    }, user.id).catch(err => console.warn('[presentations] Sanity save failed (non-fatal):', err));
 
     // ── 6. Serve binary directly on Vercel ────────────────────────────────
     const isVercel = process.env.VERCEL === '1';

@@ -32,7 +32,7 @@
 
 import { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence }   from 'framer-motion';
-import { Send, Sparkles, FileText, TrendingUp, BarChart3, AlertCircle, Settings } from 'lucide-react';
+import { Send, Sparkles, FileText, TrendingUp, BarChart3, AlertCircle, Plus } from 'lucide-react';
 import { Button }              from '@/components/ui/button';
 import { Badge }               from '@/components/ui/badge';
 import { Textarea }            from '@/components/ui/textarea';
@@ -48,11 +48,14 @@ import {
   useIsProcessing,
   useActiveSessionId,
   useSendMessage,
+  useUploadFile,
   useRestoring,
   useIsNewSession,
-  useOpenSettings,
   useStore,
 } from '@/store';
+
+// Kept in sync with /api/files SUPPORTED
+const UPLOAD_ACCEPT = '.txt,.md,.markdown,.csv,.json';
 
 function getQueryType(msg: string): string {
   const q = msg.toLowerCase();
@@ -93,9 +96,9 @@ export function ChatInterface() {
   const isProcessing    = useIsProcessing();
   const activeSessionId = useActiveSessionId();
   const sendMessage     = useSendMessage();
+  const uploadFile      = useUploadFile();
   const restoring       = useRestoring();
   const isNewSession    = useIsNewSession();
-  const openSettings    = useOpenSettings();
   const streamSteps     = useStore(s => s.streamSteps);
 
   const [input,       setInput]       = useState('');
@@ -104,6 +107,13 @@ export function ChatInterface() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef  = useRef<HTMLDivElement>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+
+  const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-uploading the same file
+    if (file && !isProcessing) uploadFile(file);
+  };
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     if (scrollAreaRef.current) {
@@ -352,11 +362,25 @@ export function ChatInterface() {
               className="max-w-3xl mx-auto flex justify-center mb-3"
             >
               <div className="flex gap-2 flex-wrap justify-center">
+                {/* Data comes from what the user uploads — surface that first */}
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Button
+                    variant="outline" size="sm"
+                    className="gap-2 hover:bg-muted/60 dark:hover:bg-muted hover:border-border transition-all duration-150"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Plus className="size-3.5 text-violet-600 dark:text-violet-400" />
+                    <span className="text-xs">Upload a report</span>
+                  </Button>
+                </motion.div>
                 {QUICK_ACTIONS.map((action, i) => (
                   <motion.div
                     key={action.label}
                     initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05, duration: 0.2 }}
+                    transition={{ delay: (i + 1) * 0.05, duration: 0.2 }}
                   >
                     <Button
                       variant="outline" size="sm"
@@ -374,29 +398,40 @@ export function ChatInterface() {
         </AnimatePresence>
 
         <div className="max-w-3xl mx-auto mb-4">
-          <div className="relative flex items-center gap-2 p-2 bg-muted/50 border border-border/50 rounded-xl backdrop-blur focus-within:ring-2 focus-within:ring-violet-500/20 focus-within:border-violet-500 transition-all duration-300">
+          {/* Pill input: fully rounded container, + for file upload on the
+              left, circular send button on the right. */}
+          <div className="relative flex items-center gap-2 p-2 pl-2.5 bg-muted/50 border border-border/50 rounded-full backdrop-blur focus-within:ring-2 focus-within:ring-violet-500/20 focus-within:border-violet-500 transition-all duration-300">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={UPLOAD_ACCEPT}
+              className="hidden"
+              onChange={handleFileChosen}
+            />
             <Button
               variant="ghost"
               size="icon"
-              onClick={openSettings}
-              aria-label="Settings"
-              title="Settings"
-              className="shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+              aria-label="Upload a research file or report"
+              title="Upload a report (CSV, JSON, TXT, Markdown)"
+              className="shrink-0 rounded-full text-muted-foreground hover:text-foreground"
             >
-              <Settings className="size-4" />
+              <Plus className="size-4" />
             </Button>
             <Textarea
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask me anything about your reports, KPIs, or request a presentation…"
+              placeholder="Ask about your uploaded reports, or request a presentation…"
               className="min-h-[40px] max-h-[120px] resize-none !bg-transparent border-0 focus-visible:ring-0 text-sm leading-relaxed"
             />
             <Button
               size="icon"
               onClick={() => handleSend()}
               disabled={!input.trim() || isProcessing}
-              className={`shrink-0 rounded-lg transition-all duration-200 ${
+              aria-label="Send message"
+              className={`shrink-0 rounded-full transition-all duration-200 ${
                 !input.trim() || isProcessing
                   ? 'opacity-50 cursor-not-allowed'
                   : 'bg-primary hover:bg-violet-600 shadow-md'

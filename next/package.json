@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "purge:global-data": "node scripts/purge-global-data.mjs"
   },
   "dependencies": {
     "@sanity/client": "^7.22.0",

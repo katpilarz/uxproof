@@ -88,6 +88,7 @@ export interface SessionSliceActions {
   newSession:    () => void;
   selectSession: (id: string) => Promise<void>;
   loadSessions:  () => Promise<void>;
+  deleteSession: (id: string) => Promise<void>;
   openHistory:   () => void;
   closeHistory:  () => void;
   openSettings:  () => void;
@@ -178,6 +179,28 @@ export const createSessionSlice: StateCreator<
       s.sessions        = sessions;
       s.sessionsLoading = false;
     });
+  },
+
+  deleteSession: async (id: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        get().showToast(data.error || 'Could not delete the conversation', { variant: 'error' });
+        return;
+      }
+      set(s => {
+        s.sessions = s.sessions.filter(x => x.sessionId !== id);
+      });
+      // If the open conversation was deleted, land on a fresh chat.
+      if (get().activeSessionId === id) {
+        get().newSession();
+      }
+      get().showToast('Conversation deleted', { variant: 'success' });
+    } catch (e) {
+      console.warn('[session-slice] deleteSession error:', e);
+      get().showToast('Could not delete the conversation', { variant: 'error' });
+    }
   },
 
   openHistory:   () => set(s => { s.historyOpen  = true;  }),

@@ -34,8 +34,8 @@ function PanelLeftRounded({ className }: { className?: string }) {
 // uxproof logomark — app-icon tile: violet gradient, a checkmark whose
 // tail rises past the tile's optical centre (evidence validated ✓) with
 // a spark dot where the insight "lands". Mirrored as the favicon in
-// app/icon.svg — keep the two in sync.
-function UxproofMark({ className }: { className?: string }) {
+// app/icon.svg — keep the two in sync. Exported for the login screen.
+export function UxproofMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
       <defs>
@@ -61,6 +61,7 @@ import {
   TooltipTrigger,
 } from './ui/tooltip';
 import { useTheme } from './theme-provider';
+import { UserMenu } from './user-menu';
 
 type TopBarProps = {
   onDashboardClick: () => void;   // → /presentations
@@ -163,6 +164,11 @@ export function TopBar({
               <p>{theme === 'light' ? 'Dark mode' : 'Light mode'}</p>
             </TooltipContent>
           </Tooltip>
+
+          <div className="h-6 w-px bg-border mx-1" />
+
+          {/* Signed-in user — avatar opens the account dropdown (log out) */}
+          <UserMenu />
         </div>
 
       </div>

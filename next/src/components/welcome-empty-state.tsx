@@ -221,7 +221,7 @@ export function WelcomeEmptyState() {
         </div>
         <h1 className="mb-3 display text-3xl">UX Evidence — Perfectly Presented</h1>
         <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-       Turn UX research data into client-ready PowerPoint presentations — validation made visible. </p>
+       Upload your quarterly research reports with the <span className="font-semibold text-foreground">+</span> button, then turn them into client-ready PowerPoint presentations — validation made visible. </p>
        </div>
     </div>
   );

@@ -111,14 +111,17 @@ export interface ReportDelta {
 
 // ─── GROQ ─────────────────────────────────────────────────────────────────────
 
+// coalesce(): user-uploaded reports may carry no kpis/issues/insights at
+// all — GROQ projects missing arrays as null, and the response builders
+// call .length on them, so always fall back to [].
 const REPORT_FRAGMENT = `
   _id, reportId, quarter, year,
   client, product, platform, methods,
   susScore, susChange, taskSuccessRate, npsScore,
   participants, errorRate, conversionRate,
-  kpis[]  { _key, label, value, change, trend },
-  issues[] { _key, title, severity, description, recommendation },
-  insights[] { _key, category, title, summary }
+  "kpis":     coalesce(kpis[]  { _key, label, value, change, trend }, []),
+  "issues":   coalesce(issues[] { _key, title, severity, description, recommendation }, []),
+  "insights": coalesce(insights[] { _key, category, title, summary }, [])
 `;
 
 const QUARTER_ORDER = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
@@ -126,30 +129,43 @@ type Quarter = typeof QUARTER_ORDER[number];
 
 // ─── Raw fetchers ─────────────────────────────────────────────────────────────
 
-export async function fetchReport(quarter: string, year: number): Promise<SanityReport | null> {
+// All fetchers are USER-SCOPED: reports are created from a user's uploaded
+// files and carry an owner reference, so every query filters on it. There
+// is no global dataset any more.
+
+export async function fetchReport(quarter: string, year: number, userId: string): Promise<SanityReport | null> {
   return sanity.fetch(
-    `*[_type == "report" && quarter == $quarter && year == $year][0] { ${REPORT_FRAGMENT} }`,
-    { quarter, year }
+    `*[_type == "report" && quarter == $quarter && year == $year && user._ref == $userId][0] { ${REPORT_FRAGMENT} }`,
+    { quarter, year, userId }
   );
 }
 
-export async function fetchReportsByYear(year: number): Promise<SanityReport[]> {
+export async function fetchReportsByYear(year: number, userId: string): Promise<SanityReport[]> {
   return sanity.fetch(
-    `*[_type == "report" && year == $year] | order(quarter asc) { ${REPORT_FRAGMENT} }`,
-    { year }
+    `*[_type == "report" && year == $year && user._ref == $userId] | order(quarter asc) { ${REPORT_FRAGMENT} }`,
+    { year, userId }
   );
 }
 
-export async function fetchReportsByQuarters(quarters: Quarter[], year: number): Promise<SanityReport[]> {
+export async function fetchReportsByQuarters(quarters: Quarter[], year: number, userId: string): Promise<SanityReport[]> {
   return sanity.fetch(
-    `*[_type == "report" && year == $year && quarter in $quarters] | order(quarter asc) { ${REPORT_FRAGMENT} }`,
-    { year, quarters }
+    `*[_type == "report" && year == $year && quarter in $quarters && user._ref == $userId] | order(quarter asc) { ${REPORT_FRAGMENT} }`,
+    { year, quarters, userId }
   );
 }
 
-export async function fetchAllReports(): Promise<SanityReport[]> {
+export async function fetchAllReports(userId: string): Promise<SanityReport[]> {
   return sanity.fetch(
-    `*[_type == "report"] | order(year asc, quarter asc) { ${REPORT_FRAGMENT} }`
+    `*[_type == "report" && user._ref == $userId] | order(year asc, quarter asc) { ${REPORT_FRAGMENT} }`,
+    { userId }
+  );
+}
+
+/** How many reports this user has — the "do you have any data yet?" gate. */
+export async function countUserReports(userId: string): Promise<number> {
+  return sanity.fetch(
+    `count(*[_type == "report" && user._ref == $userId])`,
+    { userId }
   );
 }
 
@@ -339,16 +355,16 @@ function parseIntent(query: string): ParsedIntent {
 
 // ─── Main resolver ────────────────────────────────────────────────────────────
 
-export async function resolveReportContext(query: string): Promise<ReportContext | null> {
+export async function resolveReportContext(query: string, userId: string): Promise<ReportContext | null> {
   const intent = parseIntent(query);
 
   switch (intent.type) {
 
     case 'single': {
-      const primary = await fetchReport(intent.period.quarter, intent.period.year);
+      const primary = await fetchReport(intent.period.quarter, intent.period.year, userId);
       if (!primary) return null;
       const prev       = previousPeriod(intent.period);
-      const comparison = await fetchReport(prev.quarter, prev.year);
+      const comparison = await fetchReport(prev.quarter, prev.year, userId);
       return {
         mode: 'single',
         primary,
@@ -361,8 +377,8 @@ export async function resolveReportContext(query: string): Promise<ReportContext
 
     case 'quarter-comparison': {
       const [a, b] = await Promise.all([
-        fetchReport(intent.periodA.quarter, intent.periodA.year),
-        fetchReport(intent.periodB.quarter, intent.periodB.year),
+        fetchReport(intent.periodA.quarter, intent.periodA.year, userId),
+        fetchReport(intent.periodB.quarter, intent.periodB.year, userId),
       ]);
       if (!a || !b) return null;
       const aIdx = QUARTER_ORDER.indexOf(a.quarter);
@@ -379,7 +395,7 @@ export async function resolveReportContext(query: string): Promise<ReportContext
     }
 
     case 'year': {
-      const reports = await fetchReportsByYear(intent.year);
+      const reports = await fetchReportsByYear(intent.year, userId);
       if (!reports.length) return null;
       return {
         mode:       'year',
@@ -391,8 +407,8 @@ export async function resolveReportContext(query: string): Promise<ReportContext
 
     case 'year-comparison': {
       const [reportsA, reportsB] = await Promise.all([
-        fetchReportsByYear(intent.yearA),
-        fetchReportsByYear(intent.yearB),
+        fetchReportsByYear(intent.yearA, userId),
+        fetchReportsByYear(intent.yearB, userId),
       ]);
       if (!reportsA.length || !reportsB.length) return null;
       const aggA = aggregateReports(reportsA);
@@ -415,9 +431,9 @@ export async function resolveReportContext(query: string): Promise<ReportContext
 
     case 'half': {
       const quarters: Quarter[] = intent.half === 1 ? ['Q1', 'Q2'] : ['Q3', 'Q4'];
-      const reports  = await fetchReportsByQuarters(quarters, intent.year);
+      const reports  = await fetchReportsByQuarters(quarters, intent.year, userId);
       if (!reports.length) return null;
-      const prevReports = await fetchReportsByQuarters(quarters, intent.year - 1);
+      const prevReports = await fetchReportsByQuarters(quarters, intent.year - 1, userId);
       return {
         mode:                  'half-year',
         reports,
@@ -433,7 +449,7 @@ export async function resolveReportContext(query: string): Promise<ReportContext
     }
 
     case 'multi-quarter': {
-      const reports = await fetchReportsByQuarters(intent.quarters, intent.year);
+      const reports = await fetchReportsByQuarters(intent.quarters, intent.year, userId);
       if (!reports.length) return null;
       return {
         mode:       'multi-quarter',
@@ -444,7 +460,7 @@ export async function resolveReportContext(query: string): Promise<ReportContext
     }
 
     case 'all': {
-      const reports = await fetchAllReports();
+      const reports = await fetchAllReports(userId);
       if (!reports.length) return null;
       return {
         mode:       'all',

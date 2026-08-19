@@ -37,7 +37,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createUnifiedAI } from '@/lib/agents/unified-agent';
 import { AIContext } from '@/types';
-import { createChatSession, appendMessageToSession } from '@/lib/sanity';
+import { createChatSession, appendMessageToSession, countUserFiles } from '@/lib/sanity';
+import { countUserReports } from '@/lib/services/report-query';
+import { getCurrentUser } from '@/lib/auth';
 
 const AGENT_SERVICE = process.env.AGENT_SERVICE_URL || 'http://localhost:8001';
 
@@ -170,7 +172,7 @@ function casualReply(message: string): string {
     return `Hello! I'm the **uxproof research assistant**.\n\nI can help you with:\n\n• **Analyse a quarter** — _"Analyse Q3 2025"_ or _"What is the SUS score for Q4 2025?"_\n• **Compare periods** — _"Compare Q3 vs Q4 2025"_\n• **Full year overviews** — _"Full year 2025 overview"_\n• **Generate presentations** — _"Generate Q4 2025 presentation"_ or _"Generate 2025 presentation"_\n• **Deep AI analysis** — _"Deep analysis Q3 2025"_\n\nWhat would you like to explore?`;
   }
   if (/how (can|do) you help/.test(q) || /what can you do/.test(q) || /^help\b/.test(q)) {
-    return `I'm the **uxproof research assistant** — I turn UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Query SUS, task success, NPS, error-rate and conversion data from any quarter\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
+    return `I'm the **uxproof research assistant** — I turn **your uploaded** UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Summarize research files you upload with the **+** button (CSV, JSON, TXT, Markdown)\n• Query SUS, task success, NPS, error-rate and conversion data from your uploaded quarters\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• Upload a report via **+**, then _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
   }
   if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Generate Q4 2025 presentation"_ or _"Analyse Q3 2025"_`;
   if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse Q3 2025"_`;
@@ -328,7 +330,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    console.log('[chat/route] message:', message, '| sessionId:', sessionId);
+    // Every conversation belongs to a user — sessions are created with an
+    // owner reference so history and presentations stay per-user.
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
+    }
+
+    console.log('[chat/route] message:', message, '| sessionId:', sessionId, '| user:', user.email);
 
     const aiContext: AIContext = {
       projectId: context?.project || 'UX Research Report',
@@ -343,13 +352,13 @@ export async function POST(request: NextRequest) {
     if (sessionId) {
       try {
         if (isNewSession) {
-          await createChatSession(sessionId, { quarter: aiContext.quarter });
+          await createChatSession(sessionId, { quarter: aiContext.quarter }, user.id);
         }
         await appendMessageToSession(sessionId, {
           messageId: `msg_${Date.now()}_user`,
           role:      'user',
           content:   message,
-        });
+        }, user.id);
       } catch (e) {
         console.warn('[chat/route] session persistence failed:', e);
       }
@@ -373,6 +382,47 @@ export async function POST(request: NextRequest) {
     let presentationScope:   'quarter' | 'year' | undefined = undefined;
     let contextRefOverride:  { project: string; quarter: string } | undefined = undefined;
 
+    // ── No-data gate ────────────────────────────────────────────────────
+    // All analysis is grounded in what THIS user uploaded. If they ask a
+    // data-shaped question (analysis / deep / presentation) with an empty
+    // workspace, ask for an upload instead of running the machinery.
+    if (intent !== 'casual') {
+      const [reportCount, fileCount] = await Promise.all([
+        countUserReports(user.id),
+        countUserFiles(user.id).catch(() => 0),
+      ]);
+      if (reportCount === 0 && fileCount === 0) {
+        const uploadPrompt =
+          `I don't have any research data for you yet — my answers are based entirely on **what you upload**.\n\n` +
+          `Click the **+** button next to the chat input to upload a report:\n\n` +
+          `• **CSV or JSON** with \`quarter\`, \`year\` and \`susScore\` (plus any of task success, NPS, error rate, participants, issues, insights) — becomes queryable research data for analyses and presentation decks\n` +
+          `• **TXT or Markdown** — kept as reference context and summarized\n\n` +
+          `Once uploaded, ask me again${/\bq[1-4]|20\d{2}/i.test(message) ? ` about ${message.match(/\b(?:Q[1-4]\s*)?20\d{2}\b|\bQ[1-4]\b/i)?.[0] ?? 'that period'}` : ''}.`;
+        if (sessionId) {
+          try {
+            await appendMessageToSession(sessionId, {
+              messageId: `msg_${Date.now()}_assistant`,
+              role:      'assistant',
+              content:   uploadPrompt,
+            }, user.id);
+          } catch (e) {
+            console.warn('[chat/route] appendMessageToSession (upload prompt) failed:', e);
+          }
+        }
+        return NextResponse.json({
+          id:               Date.now().toString(),
+          role:             'assistant',
+          content:          uploadPrompt,
+          timestamp:        new Date(),
+          agentInfo:        { agent: 'uxproof assistant', processingTime: '0.0s' },
+          contextRef:       undefined,
+          showPresentation: false,
+          processingType:   'analysis',
+          isError:          false,
+        });
+      }
+    }
+
     if (intent === 'casual') {
       // Casual / meta — local reply, no Sanity, no agent service, no contextRef
       responseContent    = casualReply(message);
@@ -385,7 +435,7 @@ export async function POST(request: NextRequest) {
       // actual .pptx is generated later when the user clicks the
       // "Generate & download .pptx" button — that handler POSTs to
       // /api/presentations with the scope + year/quarter forwarded below.
-      const unifiedAI    = createUnifiedAI(aiContext);
+      const unifiedAI    = createUnifiedAI(aiContext, user.id);
       const response     = await unifiedAI.processQuery(resolvedMessage);
       responseContent    = response.content ?? '';
       processingType     = 'presentation';
@@ -410,7 +460,7 @@ export async function POST(request: NextRequest) {
       // 'data' — short factual queries: "SUS score for Q4 2025",
       // "compare Q3 vs Q4", "analyse Q3 2025", "full year 2025", etc.
       // unified-agent decides metric vs analysis vs comparison vs year.
-      const unifiedAI = createUnifiedAI(aiContext);
+      const unifiedAI = createUnifiedAI(aiContext, user.id);
       const response  = await unifiedAI.processQuery(resolvedMessage);
 
       console.log('[chat/route] unifiedAI response length:', response.content?.length ?? 0);
@@ -443,7 +493,7 @@ export async function POST(request: NextRequest) {
     // Hard guard — never return empty content
     if (!responseContent?.trim()) {
       console.warn('[chat/route] empty responseContent for intent:', intent, 'message:', message);
-      responseContent = `I couldn't find data for that request. Available data spans **Q1 2024 – Q1 2026**.\n\nTry:\n• _"Analyse Q3 2025"_\n• _"Full year 2025"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
+      responseContent = `I couldn't find research data for that request in your workspace. Upload a report with the **+** button next to the chat input, or ask about a period you've already uploaded.`;
     }
 
     // contextRef computed BEFORE persistence so the stored assistant
@@ -476,7 +526,7 @@ export async function POST(request: NextRequest) {
           year:              showPresentation ? year    : undefined,
           quarter:           showPresentation ? quarter : undefined,
           contextQuarter:    contextRef?.quarter,
-        });
+        }, user.id);
       } catch (e) {
         console.warn('[chat/route] appendMessageToSession (assistant) failed:', e);
       }

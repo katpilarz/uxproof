@@ -28,8 +28,9 @@ function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Anchored above the chat input (bottom sheet style), not screen-centred */}
-      <DialogContent className="max-w-lg flex flex-col gap-0 p-0 overflow-hidden top-auto bottom-28 translate-y-0 max-h-[calc(100vh-9rem)] data-open:slide-in-from-bottom-4 data-closed:slide-out-to-bottom-4">
+      {/* Opened from the profile dropdown — anchored below the avatar in
+          the top-right corner, not screen-centred. */}
+      <DialogContent className="max-w-md flex flex-col gap-0 p-0 overflow-hidden top-16 bottom-auto left-auto right-3 translate-x-0 translate-y-0 max-h-[calc(100vh-5rem)] data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2">
         {/* Header */}
         <DialogHeader className="px-6 pt-3 flex-shrink-0">
           <DialogTitle className="text-2xl">Settings</DialogTitle>
@@ -43,19 +44,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               <SectionHeader icon={FileText} label="Active Context" />
               <div className="space-y-4">
                 <p className="text-xs text-muted-foreground">
-                  The AI will use chosen report and template as its primary context for all responses and generated presentations.
+                  Answers and presentations are grounded in the research reports
+                  you upload — add them with the <span className="font-semibold">+</span> button
+                  next to the chat input. Choose the deck template below.
                 </p>
-                <Select defaultValue="aurelo-q1-2026">
-                  <SelectTrigger className="w-full bg-muted/30">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="aurelo-q1-2026">Aurelo — Q1 2026</SelectItem>
-                    <SelectItem value="aurelo-q4-2025">Aurelo — Q4 2025</SelectItem>
-                    <SelectItem value="aurelo-q3-2025">Aurelo — Q3 2025</SelectItem>
-                    <SelectItem value="aurelo-q2-2025">Aurelo — Q2 2025</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Select defaultValue="monochrome-research">
                   <SelectTrigger className="w-full bg-muted/30">
                     <SelectValue />

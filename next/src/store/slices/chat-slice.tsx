@@ -44,6 +44,7 @@ export interface ChatSliceState {
 
 export interface ChatSliceActions {
   sendMessage:          (message: string, sessionId: string, context?: Partial<AIContext>) => Promise<void>;
+  uploadFile:           (file: File) => Promise<void>;
   resetChat:            () => void;
   setMessages:          (messages: Message[]) => void;
   setView:              (view: 'chat' | 'dashboard') => void;
@@ -170,6 +171,77 @@ export const createChatSlice: StateCreator<
   ChatSlice
 > = (set, get) => ({
   ...initialState,
+
+  /**
+   * Upload a research file/report through the chat "+" button. Mirrors
+   * sendMessage's shape: optimistic user message with the attachment,
+   * POST to /api/files (which extracts, summarizes, and persists both
+   * turns to the session), then the summary lands as an assistant
+   * message. Confirmed via toast.
+   */
+  uploadFile: async (file: File) => {
+    const sessionId = get().activeSessionId;
+    const isNew     = get().isNewSession;
+
+    set(s => {
+      s.loading.chat = true;
+      s.error        = null;
+      s.messages.push({
+        id:          makeMsgId(),
+        role:        'user',
+        content:     `Uploaded ${file.name}`,
+        timestamp:   new Date(makeTimestamp()),
+        attachments: [{ name: file.name, type: file.type || 'file' }],
+      });
+    });
+
+    if (isNew) {
+      set(s => { s.isNewSession = false; });
+      if (typeof window !== 'undefined') {
+        window.history.pushState(null, '', `/chat/${sessionId}`);
+      }
+    }
+
+    try {
+      const form = new FormData();
+      form.set('file', file);
+      form.set('sessionId', sessionId);
+      form.set('isNewSession', String(isNew));
+
+      const res  = await fetch('/api/files', { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+
+      set(s => {
+        s.loading.chat = false;
+        s.messages.push({
+          id:        makeMsgId(),
+          role:      'assistant',
+          content:   data.assistantMessage?.content || `Stored ${file.name} in your files.`,
+          timestamp: new Date(makeTimestamp()),
+        });
+      });
+      get().showToast(
+        data.reportsCreated?.length
+          ? `Report uploaded — ${data.reportsCreated.join(', ')} added to your data`
+          : `${file.name} uploaded`,
+        { variant: 'success' },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Upload failed. Please try again.';
+      set(s => {
+        s.loading.chat = false;
+        s.messages.push({
+          id:        makeMsgId(),
+          role:      'assistant',
+          content:   msg,
+          timestamp: new Date(makeTimestamp()),
+          isError:   true,
+        });
+      });
+      get().showToast('Upload failed', { variant: 'error' });
+    }
+  },
 
   sendMessage: async (message, sessionId, context = {}) => {
     const isNew = get().isNewSession;

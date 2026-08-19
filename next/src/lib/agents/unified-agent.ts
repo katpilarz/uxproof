@@ -447,7 +447,7 @@ function buildResponse(
 // ─── Period-clarification response ───────────────────────────────────────────
 
 function buildPeriodClarification(topic: string): string {
-  return `Which period would you like the **${topic}** for?\n\nFor example:\n\n• _"Give me ${topic} for Q3 2025"_\n• _"Show me ${topic} for full year 2025"_\n• _"Compare ${topic} for Q2 vs Q3 2025"_\n\nAvailable data spans **Q1 2024 – Q1 2026**.`;
+  return `Which period would you like the **${topic}** for?\n\nFor example:\n\n• _"Give me ${topic} for Q3 2025"_\n• _"Show me ${topic} for full year 2025"_\n• _"Compare ${topic} for Q2 vs Q3 2025"_`;
 }
 
 // ─── Year-scope hint injection ───────────────────────────────────────────────
@@ -469,7 +469,7 @@ function ensureYearScopeQuery(query: string): string {
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
-async function processQuery(context: AIContext, query: string): Promise<AIResponse> {
+async function processQuery(context: AIContext, query: string, userId: string): Promise<AIResponse> {
   const t0 = Date.now();
 
   // ── 1. Casual / meta — no Sanity, no contextRef ────────────────────────
@@ -520,10 +520,10 @@ async function processQuery(context: AIContext, query: string): Promise<AIRespon
     ? ensureYearScopeQuery(query)
     : query;
 
-  // ── 5. Resolve context from Sanity ─────────────────────────────────────
+  // ── 5. Resolve context from Sanity — scoped to this user's reports ─────
   let ctx: ReportContext | null = null;
   try {
-    ctx = await resolveReportContext(effectiveQuery);
+    ctx = await resolveReportContext(effectiveQuery, userId);
   } catch (e) {
     console.error('[unified-agent] resolveReportContext error:', e);
     const msg = e instanceof Error ? e.message : String(e);
@@ -543,7 +543,7 @@ async function processQuery(context: AIContext, query: string): Promise<AIRespon
     return {
       id:        Date.now().toString(),
       role:      'assistant',
-      content:   `I couldn't find data for that request. Available data spans **Q1 2024 – Q1 2026**.\n\nTry:\n• _"Analyse Q3 2025"_\n• _"Full year 2025"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`,
+      content:   `I couldn't find research data for that period in your workspace.\n\nAll answers are grounded in the reports **you upload** — use the **+** button next to the chat input to add one (CSV, JSON, TXT or Markdown), then ask again. You can also ask _"what data do I have?"_ to see the periods already available.`,
       timestamp: new Date(),
       agentInfo: { agent: 'uxproof assistant', processingTime: elapsed },
       contextRef: undefined,
@@ -570,6 +570,6 @@ async function processQuery(context: AIContext, query: string): Promise<AIRespon
   };
 }
 
-export function createUnifiedAI(context: AIContext) {
-  return { processQuery: (query: string) => processQuery(context, query) };
+export function createUnifiedAI(context: AIContext, userId: string) {
+  return { processQuery: (query: string) => processQuery(context, query, userId) };
 }

@@ -9,6 +9,12 @@ export default {
       type: 'string',
     },
     {
+      name: 'user',
+      title: 'Owner',
+      type: 'reference',
+      to: [{ type: 'user' }],
+    },
+    {
       name: 'quarter',       
       title: 'Quarter',
       type: 'string',
