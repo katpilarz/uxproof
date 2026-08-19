@@ -75,14 +75,6 @@ export async function getPresentationsForUser(userId: string) {
   );
 }
 
-export async function storeProcessedIntelligence(intelligence: any) {
-  return client?.create({
-    _type: 'executed_intelligence',
-    ...intelligence,
-    processedAt: new Date().toISOString(),
-  });
-}
-
 export async function getHistoricalData(quarter: string) {
   const comparisonQuarter =
     quarter === 'Q3' ? 'Q2' :
@@ -346,10 +338,14 @@ export async function getSlidePlanForPeriod(quarter: string, year: number, userI
 
 // Convenience: resolve _id directly. Some deployments key slidePlans
 // by a stable _id like `slideplan_<reportId>`.
-export async function getSlidePlanById(slidePlanId: string) {
+// userId guards a client-supplied _id from resolving another owner's plan;
+// pre-scoping legacy plans carry no owner and stay reachable (single-machine).
+export async function getSlidePlanById(slidePlanId: string, userId?: string) {
   return client?.fetch(
-    `*[_type == "slidePlan" && _id == $id][0]${SLIDE_PLAN_PROJECTION}`,
-    { id: slidePlanId },
+    `*[_type == "slidePlan" && _id == $id${
+      userId ? ' && (!defined(user) || user._ref == $userId)' : ''
+    }][0]${SLIDE_PLAN_PROJECTION}`,
+    userId ? { id: slidePlanId, userId } : { id: slidePlanId },
   );
 }
 

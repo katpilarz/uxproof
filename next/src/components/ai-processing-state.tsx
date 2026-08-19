@@ -52,11 +52,11 @@ export function AIProcessingState({
           <div className={cn(
             'size-4 rounded flex items-center justify-center flex-shrink-0',
             idx === 0
-              ? 'bg-foreground/10'
+              ? 'bg-violet-500/10'
               : 'bg-muted',
           )}>
             {idx === 0 ? (
-              <Loader2 className="size-2.5 animate-spin text-foreground" />
+              <Loader2 className="size-2.5 animate-spin text-violet-500" />
             ) : (
               <div className="size-1.5 rounded-sm bg-muted-foreground/30" />
             )}

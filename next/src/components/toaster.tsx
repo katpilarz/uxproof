@@ -29,9 +29,9 @@ const VARIANT_ICON = {
 } as const;
 
 const VARIANT_ICON_CLASS = {
-  success: 'text-foreground',
-  error:   'text-foreground',
-  info:    'text-muted-foreground',
+  success: 'text-emerald-500',
+  error:   'text-red-500',
+  info:    'text-violet-500',
 } as const;
 
 function CountdownRing({

@@ -74,7 +74,7 @@ export function LoginScreen() {
         <div className="flex flex-col items-center mb-8">
           <UxproofMark className="size-12 mb-4" />
           <h1 className="text-xl font-semibold tracking-tight lowercase">
-            <span className="text-foreground">ux</span>proof
+            <span className="text-violet-600 dark:text-violet-400">ux</span>proof
           </h1>
           <p className="text-sm text-muted-foreground mt-1.5 text-center">
             Sign in to keep your conversations and presentations together.
@@ -88,7 +88,7 @@ export function LoginScreen() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               aria-label={avatar ? 'Change avatar image' : 'Upload avatar image'}
-              className="relative size-20 rounded-full border border-dashed border-border bg-muted/40 overflow-hidden grid place-items-center hover:border-foreground/40 transition-colors group"
+              className="relative size-20 rounded-full border border-dashed border-border bg-muted/40 overflow-hidden grid place-items-center hover:border-violet-400 transition-colors group"
             >
               {avatarUrl ? (
                 // Local preview of the picked file — plain <img> is intentional
@@ -96,7 +96,7 @@ export function LoginScreen() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="Avatar preview" className="size-full object-cover" />
               ) : (
-                <Camera className="size-6 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <Camera className="size-6 text-muted-foreground group-hover:text-violet-500 transition-colors" />
               )}
             </button>
             {avatar ? (

@@ -18,6 +18,13 @@ export default defineType({
   type: 'document',
   fields: [
     defineField({ name: 'reportId',          type: 'string',   title: 'Report ID' }),
+    defineField({
+      name: 'user',
+      title: 'Owner',
+      type: 'reference',
+      to: [{ type: 'user' }],
+      description: 'Set when the plan was generated from a user-scoped pipeline run.',
+    }),
     defineField({ name: 'period',            type: 'string',   title: 'Period' }),
     defineField({ name: 'presentationTitle', type: 'string',   title: 'Presentation Title' }),
     defineField({ name: 'totalSlides',       type: 'number',   title: 'Total Slides' }),

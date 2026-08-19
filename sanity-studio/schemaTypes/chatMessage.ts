@@ -27,5 +27,37 @@ export default {
       title: 'Timestamp',
       type: 'datetime',
     },
+    // Presentation-card metadata written by appendMessageToSession so
+    // history restore can re-render the card on assistant messages.
+    {
+      name: 'showPresentation',
+      title: 'Show Presentation Card',
+      type: 'boolean',
+    },
+    {
+      name: 'presentationScope',
+      title: 'Presentation Scope',
+      type: 'string',
+      options: {
+        list: ['quarter', 'year'],
+        layout: 'radio',
+      },
+    },
+    {
+      name: 'year',
+      title: 'Presentation Year',
+      type: 'number',
+    },
+    {
+      name: 'quarter',
+      title: 'Presentation Quarter',
+      type: 'string',
+    },
+    {
+      name: 'contextQuarter',
+      title: 'Context Period Label',
+      type: 'string',
+      description: 'Human label of the resolved period, e.g. "Full Year 2025"',
+    },
   ],
 };

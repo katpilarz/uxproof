@@ -230,6 +230,43 @@ function currentPeriod(): { quarter: string; year: number } {
   return { quarter: `Q${Math.floor(now.getMonth() / 3) + 1}`, year: now.getFullYear() };
 }
 
+/**
+ * When the model's reply is cut off by the num_predict cap, JSON.parse fails
+ * even though the scalar metrics are all present — they come first in the
+ * requested shape and long issues/insights arrays are what overflow. Recover
+ * the scalars from the truncated prefix so the report survives; the arrays
+ * are dropped for that upload.
+ */
+function salvageScalarFields(content: string): Record<string, unknown> | null {
+  const out: Record<string, unknown> = {};
+  const str = (k: string) => content.match(new RegExp(`"${k}"\\s*:\\s*"([^"]+)"`))?.[1];
+  const num = (k: string) => {
+    const m = content.match(new RegExp(`"${k}"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)`));
+    return m ? parseFloat(m[1]) : undefined;
+  };
+  for (const field of NUMERIC_FIELDS) {
+    const v = num(field);
+    if (v !== undefined) out[field] = v;
+  }
+  const quarter = str('quarter');
+  if (quarter) out.quarter = quarter;
+  const year = num('year');
+  if (year !== undefined) out.year = year;
+  for (const field of ['client', 'product', 'platform']) {
+    const v = str(field);
+    if (v) out[field] = v;
+  }
+  return out.susScore != null ? out : null;
+}
+
+// Models drift off the requested low|medium|high scale ("critical", "major");
+// normalize instead of losing the issue.
+const SEVERITY_MAP: Record<string, string> = {
+  critical: 'high', blocker: 'high', major: 'high', high: 'high',
+  moderate: 'medium', medium: 'medium',
+  minor: 'low', trivial: 'low', low: 'low',
+};
+
 async function extractReportViaModel(filename: string, text: string): Promise<ParsedReport | null> {
   try {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
@@ -239,7 +276,7 @@ async function extractReportViaModel(filename: string, text: string): Promise<Pa
         model:   OLLAMA_MODEL,
         stream:  false,
         format:  'json',
-        options: { temperature: 0, num_predict: 800 },
+        options: { temperature: 0, num_predict: 1200 },
         messages: [
           {
             role: 'system',
@@ -253,19 +290,35 @@ async function extractReportViaModel(filename: string, text: string): Promise<Pa
               '"insights": [{"category", "title", "summary"}] or []}\n' +
               'STRICT RULES: use ONLY values that literally appear in the document — never estimate, convert, or invent a number. ' +
               'A metric not present in the document is null. quarter/year only if the document names them. ' +
-              'At most 5 issues and 5 insights, each grounded in the document.',
+              'At most 3 issues and 3 insights, each grounded in the document. BE TERSE: every ' +
+              'description, recommendation and summary must stay under 20 words — the reply must fit the token budget.',
           },
           { role: 'user', content: `Document "${filename}":\n\n${text.slice(0, 8000)}` },
         ],
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) return null;
 
-    const data = await res.json();
-    let raw: Record<string, unknown>;
-    try { raw = JSON.parse(data?.message?.content ?? 'null'); } catch { return null; }
+    const data    = await res.json();
+    const content = data?.message?.content ?? 'null';
+    let raw: Record<string, unknown> | null;
+    try {
+      raw = JSON.parse(content);
+    } catch {
+      raw = salvageScalarFields(content);
+      if (raw) console.warn('[api/files] model reply truncated — salvaged scalar metrics only');
+    }
     if (!raw || typeof raw !== 'object') return null;
+
+    if (Array.isArray(raw.issues)) {
+      for (const issue of raw.issues) {
+        if (issue && typeof issue === 'object' && typeof (issue as Record<string, unknown>).severity === 'string') {
+          const sev = ((issue as Record<string, string>).severity || '').toLowerCase();
+          (issue as Record<string, string>).severity = SEVERITY_MAP[sev] ?? 'medium';
+        }
+      }
+    }
 
     // Grounding guardrail: keep only numeric fields whose value literally
     // appears in the source text. susScore is required for a report.

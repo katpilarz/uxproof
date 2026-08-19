@@ -146,7 +146,7 @@ export function FilesView() {
             return (
               <Card key={file._id} className="border border-border bg-card overflow-hidden p-0">
                 <div className="flex items-center gap-3 p-4">
-                  <div className="size-10 rounded-lg bg-muted text-foreground grid place-items-center shrink-0">
+                  <div className="size-10 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 grid place-items-center shrink-0">
                     <FileText className="size-5" />
                   </div>
 
@@ -182,7 +182,7 @@ export function FilesView() {
                       title="Run a fresh summary in a new chat"
                       className="gap-1.5 text-xs"
                     >
-                      <Sparkles className="size-3.5" />
+                      <Sparkles className="size-3.5 text-violet-600 dark:text-violet-400" />
                       Summarize
                     </Button>
                     <Button

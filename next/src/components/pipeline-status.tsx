@@ -27,9 +27,9 @@ const AGENT_LABELS: Record<string, string> = {
 
 const StatusIcon = ({ status }: { status: StepStatus }) => {
   switch (status) {
-    case 'running':   return <Loader2  className="size-4 text-foreground animate-spin" />;
-    case 'completed': return <CheckCircle2 className="size-4 text-foreground" />;
-    case 'failed':    return <XCircle  className="size-4 text-foreground" />;
+    case 'running':   return <Loader2  className="size-4 text-violet-500 animate-spin" />;
+    case 'completed': return <CheckCircle2 className="size-4 text-emerald-500" />;
+    case 'failed':    return <XCircle  className="size-4 text-red-500" />;
     case 'skipped':   return <SkipForward  className="size-4 text-muted-foreground/50" />;
     default:          return <Circle   className="size-4 text-muted-foreground/30" />;
   }
@@ -43,9 +43,9 @@ export function PipelineStatus({ steps, summary, className }: PipelineStatusProp
           key={key}
           className={cn(
             'flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs transition-colors',
-            step.status === 'running'   && 'bg-muted',
-            step.status === 'completed' && 'bg-muted/50',
-            step.status === 'failed'    && 'bg-muted/50',
+            step.status === 'running'   && 'bg-violet-500/10',
+            step.status === 'completed' && 'bg-emerald-500/5',
+            step.status === 'failed'    && 'bg-red-500/5',
           )}
         >
           <StatusIcon status={step.status} />

@@ -29,6 +29,7 @@ import PptxGenJS from 'pptxgenjs';
 import fs from 'fs/promises';
 import { ASSETS, assertAssetsReady } from './ppt-assets';
 import { BRAND } from './branding/brand';
+import { downloadsDir } from './downloads';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -271,18 +272,16 @@ export async function generatePowerPoint(
     }
   }
 
-  const isVercel    = process.env.VERCEL === '1';
-  const dirBase     = isVercel ? '/tmp' : process.cwd() + '/public';
-  const downloadDir = `${dirBase}/downloads`;
+  const downloadDir = downloadsDir();
   await fs.mkdir(downloadDir, { recursive: true });
 
   const fileName = `uxproof_report_${Date.now()}.pptx`;
   const filePath = `${downloadDir}/${fileName}`;
   await pptx.writeFile({ fileName: filePath });
 
-  const downloadUrl = isVercel
-    ? `/api/presentations/file/${fileName}`
-    : `/downloads/${fileName}`;
+  // Always route downloads through the authenticated API endpoint —
+  // decks are written outside public/ so there is no static path to them.
+  const downloadUrl = `/api/presentations/file/${fileName}`;
 
   return {
     presentationId: `ppt_${Date.now()}`,

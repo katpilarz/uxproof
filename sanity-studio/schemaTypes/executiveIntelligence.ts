@@ -6,6 +6,13 @@ export default defineType({
   type: 'document',
   fields: [
     defineField({ name: 'reportId',         type: 'string',  title: 'Report ID' }),
+    defineField({
+      name: 'user',
+      title: 'Owner',
+      type: 'reference',
+      to: [{ type: 'user' }],
+      description: 'Set when the intelligence came from a user-scoped pipeline run.',
+    }),
     defineField({ name: 'quarter',          type: 'string',  title: 'Quarter' }),
     defineField({ name: 'year',             type: 'number',  title: 'Year' }),
     defineField({ name: 'executiveSummary', type: 'text',    title: 'Executive Summary' }),
