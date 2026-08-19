@@ -111,7 +111,7 @@ export function StreamingMessage({
       <MarkdownMessage content={displayed || ''} />
       {isStreaming && displayed.length > 0 && (
         <span
-          className="inline-block w-[2px] h-[13px] ml-0.5 align-text-bottom rounded-full bg-violet-500 dark:bg-violet-400 animate-blink"
+          className="inline-block w-[2px] h-[13px] ml-0.5 align-text-bottom rounded-full bg-foreground animate-blink"
           aria-hidden="true"
         />
       )}

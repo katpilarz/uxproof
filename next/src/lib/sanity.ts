@@ -180,6 +180,15 @@ export async function countUserFiles(userId: string): Promise<number> {
   )) ?? 0;
 }
 
+/** Newest upload with this filename — for "Summarize the file …" prompts. */
+export async function getUserFileByName(userId: string, filename: string) {
+  return client?.fetch(
+    `*[_type == "userFile" && user._ref == $userId && filename == $filename]
+      | order(uploadedAt desc)[0]{ _id, filename, textContent, summary, reportsCreated }`,
+    { userId, filename },
+  );
+}
+
 /**
  * Upsert a user-owned report parsed from an uploaded file. The _id is
  * deterministic per user+period, so re-uploading a corrected file for the
@@ -324,10 +333,12 @@ export async function getSlidePlan(reportId: string) {
 }
 
 // Convenience: resolve quarter+year → reportId → slidePlan in one call.
-export async function getSlidePlanForPeriod(quarter: string, year: number) {
+// userId scopes the report lookup to the owner — without it a stale seed
+// report for the same period could hijack the deck with foreign data.
+export async function getSlidePlanForPeriod(quarter: string, year: number, userId?: string) {
   const report: any = await client?.fetch(
-    `*[_type == "report" && quarter == $quarter && year == $year][0]{ reportId, _id }`,
-    { quarter, year },
+    `*[_type == "report" && quarter == $quarter && year == $year${userId ? ' && user._ref == $userId' : ''}][0]{ reportId, _id }`,
+    userId ? { quarter, year, userId } : { quarter, year },
   );
   if (!report) return null;
   return getSlidePlan(report.reportId || report._id);
@@ -359,22 +370,28 @@ export async function getSlidePlanById(slidePlanId: string) {
 // Returns null only if neither a year plan nor any quarter plan exists
 // for the given year.
 
-export async function getSlidePlanForYear(year: number) {
-  // 1. Try the explicit year-scope plan first.
+export async function getSlidePlanForYear(year: number, userId?: string) {
+  // 1. Try the explicit year-scope plan first. User-scoped requests use
+  //    the per-user id (slideplan_year_<year>_<userSuffix>) and never the
+  //    global one — a global plan may aggregate another owner's data.
+  const planId = userId
+    ? `slideplan_year_${year}_${userId.replace(/^user_/, '')}`
+    : `slideplan_year_${year}`;
   const yearPlan: any = await client?.fetch(
     `*[_type == "slidePlan" && _id == $id][0]${SLIDE_PLAN_PROJECTION}`,
-    { id: `slideplan_year_${year}` },
+    { id: planId },
   );
   if (yearPlan) {
     console.log('[slidePlan] year-scope plan found:', yearPlan._id);
     return yearPlan;
   }
 
-  // 2. Fallback — most recent quarter's plan within that year.
+  // 2. Fallback — most recent quarter's plan within that year (owner-scoped
+  //    when a userId is given).
   const latestReport: any = await client?.fetch(
-    `*[_type == "report" && year == $year]
+    `*[_type == "report" && year == $year${userId ? ' && user._ref == $userId' : ''}]
        | order(quarter desc)[0]{ reportId, _id }`,
-    { year },
+    userId ? { year, userId } : { year },
   );
   if (!latestReport) {
     console.warn(`[slidePlan] no reports found for year ${year}`);

@@ -62,6 +62,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push('/presentations');
   };
 
+  // "Files" button → navigate to the uploaded-files directory
+  const handleFilesClick = () => {
+    router.push('/files');
+  };
+
   // Auth gate: wait for the boot-time /api/auth/me check, then either show
   // the login screen or the app. The Toaster renders in every branch so
   // sign-in/out confirmations are never swallowed by the swap.
@@ -87,6 +92,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Toaster />
       <TopBar
         onDashboardClick={handleDashboardClick}
+        onFilesClick={handleFilesClick}
         onLogoClick={handleLogoClick}
         onHistoryClick={toggleHistory}
         historyOpen={historyOpen}

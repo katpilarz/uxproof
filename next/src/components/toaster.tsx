@@ -29,9 +29,9 @@ const VARIANT_ICON = {
 } as const;
 
 const VARIANT_ICON_CLASS = {
-  success: 'text-emerald-500',
-  error:   'text-red-500',
-  info:    'text-violet-500',
+  success: 'text-foreground',
+  error:   'text-foreground',
+  info:    'text-muted-foreground',
 } as const;
 
 function CountdownRing({
@@ -81,21 +81,23 @@ function Toast({ toast }: { toast: ToastItem }) {
   const [remaining, setRemaining] = useState(toast.duration);
   const pausedRef = useRef(false);
 
+  // Tick the countdown. The store dismissal must NOT happen inside the
+  // setState updater — updaters run during render, and updating the
+  // Toaster from there triggers React's "cannot update a component while
+  // rendering a different component" error. Expiry is handled by the
+  // effect below instead.
   useEffect(() => {
     const timer = setInterval(() => {
       if (pausedRef.current) return;
-      setRemaining(prev => {
-        const next = prev - TICK_MS;
-        if (next <= 0) {
-          clearInterval(timer);
-          dismissToast(toast.id);
-          return 0;
-        }
-        return next;
-      });
+      setRemaining(prev => Math.max(0, prev - TICK_MS));
     }, TICK_MS);
     return () => clearInterval(timer);
-  }, [toast.id, dismissToast]);
+  }, [toast.id]);
+
+  // Dismiss from an effect once the countdown reaches zero.
+  useEffect(() => {
+    if (remaining <= 0) dismissToast(toast.id);
+  }, [remaining, toast.id, dismissToast]);
 
   const Icon = VARIANT_ICON[toast.variant];
 

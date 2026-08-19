@@ -51,9 +51,16 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   Don't add cloud auth providers; keep it cookie + Sanity only.
 - **All research data is user-uploaded — there is no global dataset.** Users add
   files via the chat **+** button (`/api/files`): CSV/JSON rows carrying
-  `quarter` + `year` + `susScore` are parsed into user-owned `report` documents
-  (numbers come from the parse, never the model); TXT/Markdown files are stored
-  as `userFile` reference context with an AI-or-fallback summary. All report
+  `quarter` + `year` + `susScore` are parsed deterministically into user-owned
+  `report` documents; for prose documents (PDF/TXT/Markdown — PDF text via
+  `unpdf`, local pdf.js) the local model CONVERTS the document into the report
+  shape automatically. Conversion is not generation: every numeric field the
+  model extracts is validated to appear literally in the document text and is
+  dropped otherwise (`extractReportViaModel` guardrail); only the filing
+  period may default to the current quarter when the document names none.
+  Every upload also gets a detailed AI-or-fallback summary and a follow-up
+  message carrying the presentation card (user-click generation, no
+  auto-start). All report
   queries (`next/src/lib/services/report-query.ts`) filter on `user._ref`; a
   user with no data is asked to upload, not shown someone else's numbers.
   `npm run purge:global-data` (from `next/`) removes unowned seed docs. Known

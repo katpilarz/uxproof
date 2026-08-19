@@ -94,7 +94,7 @@ export function AIThinkingPanel({
 
   return (
     <div className={`px-4 py-3 ${className} w-full`}>
-      {/* Header — violet accent, matching your UI */}
+      {/* Header — monochrome, matching your UI */}
       <div className="flex items-center gap-2 mb-3">
         <span className="text-sm font-semibold text-black dark:text-white">
           Processing request
@@ -137,7 +137,7 @@ export function AIThinkingPanel({
   );
 }
 
-// ── Step dot — violet active state, emerald done ──────────────────────────────
+// ── Step dot — solid active state, checked done (monochrome) ──────────────────
 
 function StepDot({ state }: { state: Step['state'] }) {
   if (state === 'done') {
@@ -146,9 +146,9 @@ function StepDot({ state }: { state: Step['state'] }) {
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1,   opacity: 1 }}
         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-        className="size-4 rounded-full bg-emerald-500/15 dark:bg-emerald-500/20 flex items-center justify-center shrink-0"
+        className="size-4 rounded-full bg-foreground/15 dark:bg-foreground/20 flex items-center justify-center shrink-0"
       >
-        <svg className="size-2.5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 12 12" fill="none">
+        <svg className="size-2.5 text-foreground" viewBox="0 0 12 12" fill="none">
           <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </motion.div>
@@ -158,9 +158,9 @@ function StepDot({ state }: { state: Step['state'] }) {
   if (state === 'active') {
     return (
       <div className="size-4 shrink-0 relative flex items-center justify-center">
-        {/* Violet ping — matches your primary color */}
-        <span className="absolute size-4 rounded-full bg-violet-400/30 dark:bg-violet-400/20 animate-ping" />
-        <span className="relative size-2.5 rounded-full bg-violet-500 dark:bg-violet-400" />
+        {/* Monochrome ping — matches your primary color */}
+        <span className="absolute size-4 rounded-full bg-foreground/30 dark:bg-foreground/20 animate-ping" />
+        <span className="relative size-2.5 rounded-full bg-foreground" />
       </div>
     );
   }

@@ -1,6 +1,6 @@
 ---
 name: code-analyzer
-description: Production-grade Next.js 16 + React 19 + Tailwind CSS code quality audit of the whole app, including API routes, auth, and the project's grounding invariants. Does not modify application code — produces a prioritized findings report and refactoring roadmap, saved as a new versioned .md file in docs/audit-results/.
+description: Production-grade Next.js 16 + React 19 + Tailwind CSS code quality audit of the whole app, including API routes, auth, and the project's grounding invariants. Does not modify application code — produces a prioritized findings report and refactoring roadmap, saved as a new versioned .md file in context/audit-results/.
 tools: Read, Glob, Grep, Write
 ---
 
@@ -724,9 +724,9 @@ For each recommendation explain:
 
 Save the complete final report (Executive Summary through Refactoring Roadmap) as a **new versioned Markdown file**. Never overwrite or delete a previous version.
 
-* **Folder:** `docs/audit-results/`
+* **Folder:** `context/audit-results/`
 * **Filename:** `audit-vNN.md` — `NN` is zero-padded (`v01`, `v02`, …)
-* **Version discovery:** Glob `docs/audit-results/audit-v*.md`, find the highest existing `NN`, and use `NN + 1`. If the folder is empty, start at `v01`.
+* **Version discovery:** Glob `context/audit-results/audit-v*.md`, find the highest existing `NN`, and use `NN + 1`. If the folder is empty, start at `v01`.
 * **Format:** Markdown (`.md`) only.
 
 The report file must begin with this header block:
@@ -756,7 +756,7 @@ The goal is to make the application:
 
 **more correct, more maintainable, more accessible, more performant, more scalable, and aligned with modern React 19 + Tailwind CSS engineering practices.**
 
-Do not modify the repository — the single exception is writing your versioned report into `docs/audit-results/`.
+Do not modify the repository — the single exception is writing your versioned report into `context/audit-results/`.
 
 Do not rewrite the entire application.
 

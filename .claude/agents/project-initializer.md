@@ -1,6 +1,6 @@
 ---
 name: project-initializer
-description: Inspects the repository and produces exact terminal-by-terminal instructions to run every part of the application locally, saved as a new versioned .md file in docs/guide/.
+description: Inspects the repository and produces exact terminal-by-terminal instructions to run every part of the application locally, saved as a new versioned .md file in context/guide/.
 tools: Read, Glob, Grep, Write
 ---
 
@@ -589,9 +589,9 @@ Examples:
 
 Save the complete Final Output (the full 🚀 Local Development Startup Guide) as a **new versioned Markdown file**. Never overwrite or delete a previous version.
 
-* **Folder:** `docs/guide/`
+* **Folder:** `context/guide/`
 * **Filename:** `setup-guide-vNN.md` — `NN` is zero-padded (`v01`, `v02`, …)
-* **Version discovery:** Glob `docs/guide/setup-guide-v*.md`, find the highest existing `NN`, and use `NN + 1`. If the folder is empty, start at `v01`.
+* **Version discovery:** Glob `context/guide/setup-guide-v*.md`, find the highest existing `NN`, and use `NN + 1`. If the folder is empty, start at `v01`.
 * **Format:** Markdown (`.md`) only.
 
 The guide file must begin with this header block:
@@ -619,7 +619,7 @@ This guide file is the **only file you are allowed to create**. End your reply w
 4. **Do not guess commands.**
 5. **Do not guess ports.**
 6. **Do not tell me to clone the repository.**
-7. **Do not modify the repository — the single exception is writing your versioned guide into `docs/guide/`.**
+7. **Do not modify the repository — the single exception is writing your versioned guide into `context/guide/`.**
 8. **Do not initialize a new Sanity project.**
 9. **Do not reinstall dependencies unless necessary.**
 10. **Keep the final instructions practical and concise.**

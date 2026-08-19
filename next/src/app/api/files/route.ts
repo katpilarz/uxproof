@@ -21,6 +21,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { extractText, getDocumentProxy } from 'unpdf';
+import { aiDocumentSummary, fallbackTextSummary, sign } from '@/lib/file-analysis';
 import { getCurrentUser } from '@/lib/auth';
 import {
   createUserFile,
@@ -38,10 +40,26 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL    || 'qwen2.5:14b';
 
 // ─── Text extraction ──────────────────────────────────────────────────────────
 
-const SUPPORTED = ['txt', 'md', 'markdown', 'csv', 'json'];
+const SUPPORTED = ['txt', 'md', 'markdown', 'csv', 'json', 'pdf'];
 
 function extensionOf(name: string): string {
   return (name.split('.').pop() || '').toLowerCase();
+}
+
+/**
+ * PDF → plain text via unpdf (pdf.js under the hood, pure JS, local).
+ * Each page is prefixed with a [page N] marker so summaries can cite the
+ * page every fact comes from — the trust anchor against hallucination.
+ */
+async function extractPdfText(file: File): Promise<string> {
+  const pdf = await getDocumentProxy(new Uint8Array(await file.arrayBuffer()));
+  const { text: pages } = await extractText(pdf, { mergePages: false });
+  const pageTexts = (pages ?? []).map(p => (p ?? '').trim());
+  if (!pageTexts.some(Boolean)) return '';
+  return pageTexts
+    .map((p, i) => `[page ${i + 1}]\n${p}`)
+    .join('\n\n')
+    .trim();
 }
 
 // ─── Structured report parsing ────────────────────────────────────────────────
@@ -192,9 +210,92 @@ function parseCsvReports(text: string): ParsedReport[] {
     .filter((r): r is ParsedReport => r !== null);
 }
 
-// ─── Summaries ────────────────────────────────────────────────────────────────
+// ─── Model-based extraction for unstructured documents ───────────────────────
+//
+// PDFs / TXT / Markdown reports carry their metrics in prose. The local
+// model CONVERTS that prose into the structured report shape — it never
+// supplies values: every numeric field is validated to appear literally in
+// the document text, and any that don't are dropped. Missing quarter/year
+// default to the current period (a filing label, not a metric).
 
-const sign = (n: number) => (n >= 0 ? '+' : '');
+function numberAppearsIn(source: string, value: unknown): boolean {
+  const n = parseFloat(String(value));
+  if (!Number.isFinite(n)) return false;
+  const plain = String(n).replace(/\.0$/, '');
+  return source.includes(plain);
+}
+
+function currentPeriod(): { quarter: string; year: number } {
+  const now = new Date();
+  return { quarter: `Q${Math.floor(now.getMonth() / 3) + 1}`, year: now.getFullYear() };
+}
+
+async function extractReportViaModel(filename: string, text: string): Promise<ParsedReport | null> {
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model:   OLLAMA_MODEL,
+        stream:  false,
+        format:  'json',
+        options: { temperature: 0, num_predict: 800 },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You extract structured UX research data from documents. Respond with ONE JSON object:\n' +
+              '{"quarter": "Q1".."Q4" or null, "year": number or null, "susScore": number or null, ' +
+              '"susChange": number or null, "taskSuccessRate": number or null, "npsScore": number or null, ' +
+              '"participants": number or null, "errorRate": number or null, "conversionRate": number or null, ' +
+              '"client": string or null, "product": string or null, ' +
+              '"issues": [{"title", "severity" ("low"|"medium"|"high"), "description", "recommendation"}] or [], ' +
+              '"insights": [{"category", "title", "summary"}] or []}\n' +
+              'STRICT RULES: use ONLY values that literally appear in the document — never estimate, convert, or invent a number. ' +
+              'A metric not present in the document is null. quarter/year only if the document names them. ' +
+              'At most 5 issues and 5 insights, each grounded in the document.',
+          },
+          { role: 'user', content: `Document "${filename}":\n\n${text.slice(0, 8000)}` },
+        ],
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    let raw: Record<string, unknown>;
+    try { raw = JSON.parse(data?.message?.content ?? 'null'); } catch { return null; }
+    if (!raw || typeof raw !== 'object') return null;
+
+    // Grounding guardrail: keep only numeric fields whose value literally
+    // appears in the source text. susScore is required for a report.
+    const source = text.replace(/,/g, '');
+    for (const field of NUMERIC_FIELDS) {
+      if (raw[field] != null && !numberAppearsIn(source, raw[field])) {
+        console.warn(`[api/files] extraction guardrail dropped ${field}:`, raw[field]);
+        raw[field] = null;
+      }
+      if (raw[field] == null) delete raw[field];
+    }
+    if (raw.susScore == null) return null;
+
+    // Period is a filing label — fall back to the current quarter when the
+    // document doesn't name one.
+    const fallback = currentPeriod();
+    if (!/^Q[1-4]$/i.test(String(raw.quarter ?? ''))) raw.quarter = fallback.quarter;
+    const yr = parseInt(String(raw.year ?? ''), 10);
+    if (!(yr >= 2000 && yr <= 2100)) raw.year = fallback.year;
+
+    return toReport(raw);
+  } catch (e) {
+    console.warn('[api/files] model extraction unavailable:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+// ─── Summaries ────────────────────────────────────────────────────────────────
+// (the AI document summary + text fallback live in lib/file-analysis.ts,
+//  shared with the chat route's "Summarize the file …" prompt)
 
 function deterministicSummary(filename: string, text: string, reports: ParsedReport[]): string {
   if (reports.length) {
@@ -211,58 +312,7 @@ function deterministicSummary(filename: string, text: string, reports: ParsedRep
     return `Parsed **${reports.length} research period${reports.length === 1 ? '' : 's'}** from **${filename}**:\n\n${lines.join('\n')}\n\nThis data is now available to your analyses and presentations — try _"Analyse ${first.quarter} ${first.year}"_ or _"Generate ${first.quarter} ${first.year} presentation"_.`;
   }
 
-  const words = text.split(/\s+/).filter(Boolean).length;
-  const firstSentences = text.replace(/\s+/g, ' ').slice(0, 300).trim();
-  return `Stored **${filename}** (${words.toLocaleString()} words) in your files.\n\n> ${firstSentences}${text.length > 300 ? '…' : ''}\n\nNo structured quarterly metrics were detected, so this file is kept as reference context. To feed analyses and decks, upload a CSV or JSON containing \`quarter\`, \`year\` and \`susScore\` columns.`;
-}
-
-/**
- * Optional Ollama rewrite of the fallback summary. Numeric guardrail: every
- * substantial number in the reply must exist in the source text, otherwise
- * the rewrite is discarded. Returns null on any failure.
- */
-async function aiSummary(filename: string, text: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model:   OLLAMA_MODEL,
-        stream:  false,
-        options: { temperature: 0.2, num_predict: 300 },
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You summarize UX research documents for a research assistant. ' +
-              'Summarize the document in GitHub-flavoured markdown, under 100 words. ' +
-              'Use ONLY facts and numbers that literally appear in the document — never invent or round numbers. ' +
-              'Lead with what the document is, then the 2-3 most important findings or figures. No greetings.',
-          },
-          { role: 'user', content: `Document "${filename}":\n\n${text.slice(0, 6000)}` },
-        ],
-      }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) return null;
-    const data  = await res.json();
-    const reply = (data?.message?.content ?? '').trim();
-    if (reply.length < 20) return null;
-
-    const source = text.replace(/,/g, '');
-    for (const num of reply.replace(/,/g, '').match(/\d+(?:\.\d+)?/g) ?? []) {
-      const value = parseFloat(num);
-      if (value <= 12 && Number.isInteger(value)) continue;                    // small counts
-      if (value >= 1900 && value <= 2100 && Number.isInteger(value)) continue; // years
-      if (!source.includes(num)) {
-        console.warn('[api/files] summary guardrail: number not in source:', num);
-        return null;
-      }
-    }
-    return reply;
-  } catch {
-    return null;
-  }
+  return fallbackTextSummary(filename, text);
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -307,35 +357,78 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const text = (await file.text()).trim();
-    if (!text) {
-      return NextResponse.json({ error: 'The file appears to be empty.' }, { status: 400 });
+    // PDFs are binary — extract text via unpdf; everything else is read
+    // directly as UTF-8.
+    let text: string;
+    if (ext === 'pdf') {
+      try {
+        text = await extractPdfText(file);
+      } catch (e) {
+        console.warn('[api/files] PDF extraction failed:', e);
+        return NextResponse.json(
+          { error: 'Could not read that PDF. It may be corrupted or password-protected.' },
+          { status: 400 },
+        );
+      }
+      if (!text) {
+        return NextResponse.json(
+          { error: 'No extractable text found in the PDF — it may be a scanned document (images only).' },
+          { status: 400 },
+        );
+      }
+    } else {
+      text = (await file.text()).trim();
+      if (!text) {
+        return NextResponse.json({ error: 'The file appears to be empty.' }, { status: 400 });
+      }
     }
 
-    // 1. Structured research data → user-owned report documents
-    const parsed =
+    // 1. Structured research data → user-owned report documents.
+    //    CSV/JSON parse deterministically; for everything else (and for
+    //    CSV/JSON that didn't match the expected columns) the local model
+    //    CONVERTS the document into the report shape automatically — the
+    //    user never has to re-upload anything. Guardrails inside
+    //    extractReportViaModel keep every number literal-to-the-document.
+    let parsed =
       ext === 'json' ? parseJsonReports(text)
       : ext === 'csv' ? parseCsvReports(text)
       : [];
+    let extractedByModel = false;
+    if (!parsed.length) {
+      const modelReport = await extractReportViaModel(file.name, text);
+      if (modelReport) {
+        parsed = [modelReport];
+        extractedByModel = true;
+      }
+    }
     for (const report of parsed) {
       await upsertUserReport(user.id, report as unknown as { quarter: string; year: number } & Record<string, unknown>);
     }
     const reportsCreated = parsed.map(r => `${r.quarter} ${r.year}`);
 
-    // 2. Summary — deterministic for structured data (numbers straight from
-    //    the parse); for free-text files try the AI rewrite first.
-    let summary = deterministicSummary(file.name, text, parsed);
-    if (!parsed.length) {
-      const enhanced = await aiSummary(file.name, text);
-      if (enhanced) {
-        summary = `${enhanced}\n\n_Stored **${file.name}** in your files. To feed analyses and decks, upload a CSV or JSON with \`quarter\`, \`year\` and \`susScore\` columns._`;
+    // 2. Summary — detailed AI summary for prose documents (falls back to
+    //    the deterministic one); deterministic period listing for CSV/JSON.
+    //    When the model extracted data, say so explicitly with the values.
+    let summary: string;
+    if (parsed.length && !extractedByModel) {
+      summary = deterministicSummary(file.name, text, parsed);
+    } else {
+      summary = (await aiDocumentSummary(file.name, text)) ?? deterministicSummary(file.name, text, []);
+      if (extractedByModel) {
+        const r = parsed[0];
+        const bits = [`SUS **${r.susScore}**`];
+        if (r.taskSuccessRate !== undefined) bits.push(`task success **${r.taskSuccessRate}%**`);
+        if (r.npsScore        !== undefined) bits.push(`NPS **${sign(r.npsScore)}${r.npsScore}**`);
+        if (r.participants    !== undefined) bits.push(`**${r.participants}** participants`);
+        if (r.errorRate       !== undefined) bits.push(`error rate **${r.errorRate}%**`);
+        summary += `\n\n---\n\n📊 **Research data extracted automatically** and filed under **${r.quarter} ${r.year}**: ${bits.join(', ')}. It's now available to your analyses and presentations.`;
       }
     }
 
     // 3. The user's file directory entry
     const doc = await createUserFile(user.id, {
       filename:       file.name,
-      mimeType:       file.type || `text/${ext}`,
+      mimeType:       file.type || (ext === 'pdf' ? 'application/pdf' : `text/${ext}`),
       size:           file.size,
       summary,
       textContent:    text.slice(0, MAX_STORED_TEXT),
@@ -343,7 +436,37 @@ export async function POST(request: NextRequest) {
       sessionId,
     });
 
-    // 4. Reflect the upload in the conversation history
+    // 4. Automatic follow-up — the assistant's second message. With data
+    //    available it carries presentation-card metadata, so the chat
+    //    renders the deck card with its "Generate & download .pptx"
+    //    button (no auto-start — generation runs when the user clicks).
+    //    A typed "yes"/"generate a presentation" reply also still works.
+    let followUp: string;
+    let followUpMeta: {
+      showPresentation?:  boolean;
+      presentationScope?: 'quarter' | 'year';
+      quarter?:           string;
+      year?:              number;
+      contextQuarter?:    string;
+    } = {};
+    if (parsed.length) {
+      const latest = [...parsed].sort((a, b) => (a.year - b.year) || a.quarter.localeCompare(b.quarter)).pop()!;
+      followUp =
+        `Ready when you are — click **Generate & download .pptx** below to generate a presentation for **${latest.quarter} ${latest.year}**` +
+        (parsed.length > 1 ? `, or name another uploaded period in chat.` : `.`);
+      followUpMeta = {
+        showPresentation:  true,
+        presentationScope: 'quarter',
+        quarter:           latest.quarter,
+        year:              latest.year,
+        contextQuarter:    `${latest.quarter} ${latest.year}`,
+      };
+    } else {
+      followUp =
+        `I couldn't detect quarterly research metrics in this document, so it's stored as reference context — ask me anything about **${file.name}**.`;
+    }
+
+    // 5. Reflect the upload + both assistant turns in the conversation
     const timestamp = Date.now();
     if (sessionId) {
       try {
@@ -359,6 +482,12 @@ export async function POST(request: NextRequest) {
           messageId: `msg_${timestamp}_assistant`,
           role:      'assistant',
           content:   summary,
+        }, user.id);
+        await appendMessageToSession(sessionId, {
+          messageId: `msg_${timestamp}_followup`,
+          role:      'assistant',
+          content:   followUp,
+          ...followUpMeta,
         }, user.id);
       } catch (e) {
         console.warn('[api/files] session persistence failed:', e);
@@ -377,6 +506,13 @@ export async function POST(request: NextRequest) {
         role:      'assistant',
         content:   summary,
         timestamp: new Date(),
+      },
+      followUpMessage: {
+        id:        `${timestamp}_followup`,
+        role:      'assistant',
+        content:   followUp,
+        timestamp: new Date(),
+        ...followUpMeta,
       },
     });
   } catch (e) {

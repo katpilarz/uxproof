@@ -543,7 +543,7 @@ async function processQuery(context: AIContext, query: string, userId: string): 
     return {
       id:        Date.now().toString(),
       role:      'assistant',
-      content:   `I couldn't find research data for that period in your workspace.\n\nAll answers are grounded in the reports **you upload** — use the **+** button next to the chat input to add one (CSV, JSON, TXT or Markdown), then ask again. You can also ask _"what data do I have?"_ to see the periods already available.`,
+      content:   `I couldn't find research data for that period in your workspace.\n\nAll answers are grounded in the reports **you upload** — use the **+** button next to the chat input to add one (CSV, JSON, TXT, Markdown or PDF; I extract the research data automatically), then ask again. You can also ask _"what data do I have?"_ to see the periods already available.`,
       timestamp: new Date(),
       agentInfo: { agent: 'uxproof assistant', processingTime: elapsed },
       contextRef: undefined,

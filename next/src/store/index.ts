@@ -40,6 +40,8 @@ export const useStreamSteps      = () => useStore(s => s.streamSteps);
 
 export const useSendMessage          = () => useStore(s => s.sendMessage);
 export const useUploadFile           = () => useStore(s => s.uploadFile);
+export const usePendingPrompt        = () => useStore(s => s.pendingPrompt);
+export const useSetPendingPrompt     = () => useStore(s => s.setPendingPrompt);
 export const useResetChat            = () => useStore(s => s.resetChat);
 export const useSetMessages          = () => useStore(s => s.setMessages);
 export const useSetView              = () => useStore(s => s.setView);

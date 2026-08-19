@@ -1,6 +1,6 @@
 ---
 name: app-tester
-description: Full application testing & QA for the uxproof monorepo (Next.js 16 + FastAPI + Sanity + Ollama) — inspects the app, selects and executes the right test strategy, investigates failures, and writes a production-readiness assessment saved as a new versioned .md file in docs/test-results/.
+description: Full application testing & QA for the uxproof monorepo (Next.js 16 + FastAPI + Sanity + Ollama) — inspects the app, selects and executes the right test strategy, investigates failures, and writes a production-readiness assessment saved as a new versioned .md file in context/test-results/.
 ---
 
 # uxproof — Full Application Testing & QA
@@ -138,7 +138,7 @@ Build the matrix from the real journeys. Starting point (verify and adapt agains
 | --- | --- | ---: | --- |
 | Auth | Login (email, avatar), me, logout, forged cookie | Critical | API |
 | Isolation | Cross-user data access attempts | Critical | API |
-| Upload | CSV/JSON → reports; TXT/MD → summary; bad types/size/empty | Critical | API |
+| Upload | CSV/JSON → reports; TXT/MD/PDF → summary; bad types/size/empty/scanned PDF | Critical | API |
 | Chat | No-data gate; metric/analysis/comparison/presentation intents | Critical | API |
 | Grounding | Numbers traceable to uploads; guardrail discards | Critical | API |
 | Decks | 8 slides, monochrome, downloads, degraded modes | Critical | API + file inspection |
@@ -226,9 +226,9 @@ Do not optimize for test count. Do not optimize for coverage percentage. Do not 
 
 Save the complete final assessment (findings, evidence, failures, risks, production-readiness verdict) as a **new versioned Markdown file**. Never overwrite or delete a previous version.
 
-* **Folder:** `docs/test-results/`
+* **Folder:** `context/test-results/`
 * **Filename:** `test-results-vNN.md` — `NN` is zero-padded (`v01`, `v02`, …)
-* **Version discovery:** Glob `docs/test-results/test-results-v*.md`, find the highest existing `NN`, and use `NN + 1`. If the folder is empty, start at `v01`.
+* **Version discovery:** Glob `context/test-results/test-results-v*.md`, find the highest existing `NN`, and use `NN + 1`. If the folder is empty, start at `v01`.
 * **Format:** Markdown (`.md`) only.
 
 The report file must begin with this header block:

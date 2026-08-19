@@ -49,7 +49,7 @@ def _is_year_mode(ctx: dict) -> bool:
 
 # ── System prompts ───────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT_QUARTER = """You are a senior UX researcher at PAISAK4U preparing client-facing research reports.
+SYSTEM_PROMPT_QUARTER = """You are a senior UX researcher preparing client-facing research reports.
 You receive structured UX research data (usability metrics, issues, insights) for ONE reporting period.
 
 CRITICAL RULES:
@@ -69,7 +69,7 @@ CRITICAL RULES:
 - report_id, quarter, year MUST exactly match the primary period provided.
 """
 
-SYSTEM_PROMPT_YEAR = """You are a senior UX researcher at PAISAK4U preparing client-facing research reports.
+SYSTEM_PROMPT_YEAR = """You are a senior UX researcher preparing client-facing research reports.
 You receive aggregated full-year UX research data covering FOUR quarters (Q1–Q4) of one year.
 
 CRITICAL RULES:
@@ -343,7 +343,8 @@ class ExtractionAgent:
                 if not intelligence.get("strategic_signals"):
                     intelligence["strategic_signals"] = year_fallback["strategic_signals"]
 
-        await self._persist(intelligence, report_id)
+        user_id = (context_payload.get("metadata") or {}).get("user_id")
+        await self._persist(intelligence, report_id, user_id)
         return intelligence
 
     async def _call_llm(self, ctx: dict) -> str:
@@ -388,15 +389,23 @@ class ExtractionAgent:
 
         return validated.model_dump()
 
-    async def _persist(self, intelligence: dict, report_id: str):
+    async def _persist(self, intelligence: dict, report_id: str,
+                       user_id: str | None = None):
         """
         Write validated intelligence to Sanity.
         NOTE: metricSignals uses deltaPct (camelCase) to match the Sanity schema.
         strategicSignals stored as plain strings — sanity_service wraps with _key.
+        Year-mode _ids are suffixed per user (mirroring planning_agent's
+        slideplan_year_<year>_<userSuffix>) because report_id="year_<year>"
+        carries no owner of its own; quarter-mode report_ids already embed
+        the owner hash. The doc also gets a `user` reference when scoped.
         """
+        doc_id = f"intelligence_{report_id}"
+        if user_id and report_id.startswith("year_"):
+            doc_id += f"_{user_id.removeprefix('user_')}"
         doc = {
             "_type":   "executiveIntelligence",
-            "_id":     f"intelligence_{report_id}",
+            "_id":     doc_id,
             "reportId":         report_id,
             "quarter":          intelligence["quarter"],
             "year":             intelligence["year"],
@@ -417,6 +426,8 @@ class ExtractionAgent:
             "confidenceScore":  intelligence["confidence_score"],
             "processedAt":      datetime.datetime.utcnow().isoformat() + "Z",
         }
+        if user_id:
+            doc["user"] = {"_type": "reference", "_ref": user_id}
         await store_intelligence(doc)
 
     def _build_fallback_intelligence(

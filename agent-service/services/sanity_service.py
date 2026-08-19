@@ -107,33 +107,56 @@ async def mutate(mutations: list[dict]) -> Any:
 
 # ── Report fetchers ───────────────────────────────────────────────────────────
 
+# coalesce(): user-uploaded reports may carry no kpis/issues/insights —
+# GROQ projects missing arrays as null, which breaks iteration downstream,
+# so always fall back to [].
 REPORT_FIELDS = """
   _id, reportId, quarter, year,
   client, product, platform, methods,
   susScore, susChange, taskSuccessRate, npsScore,
   participants, errorRate, conversionRate,
-  kpis[]  { _key, label, value, change, trend },
-  issues[] { _key, title, severity, description, recommendation },
-  insights[] { _key, category, title, summary }
+  "kpis":     coalesce(kpis[]  { _key, label, value, change, trend }, []),
+  "issues":   coalesce(issues[] { _key, title, severity, description, recommendation }, []),
+  "insights": coalesce(insights[] { _key, category, title, summary }, [])
 """
 
 
-async def fetch_report(quarter: str, year: int) -> dict | None:
+# All fetchers accept an optional user_id: reports are per-user (owner
+# reference), so a scoped pipeline only ever sees the requesting user's
+# data. Without user_id the legacy global behaviour is kept for direct
+# API calls.
+
+def _user_filter(user_id: str | None) -> str:
+    return ' && user._ref == $userId' if user_id else ''
+
+
+def _with_user(params: dict, user_id: str | None) -> dict:
+    if user_id:
+        params = {**params, "userId": user_id}
+    return params
+
+
+async def fetch_report(quarter: str, year: int, user_id: str | None = None) -> dict | None:
     results = await groq_query(
-        f'*[_type == "report" && quarter == $quarter && year == $year][0] {{ {REPORT_FIELDS} }}',
-        {"quarter": quarter, "year": year},
+        f'*[_type == "report" && quarter == $quarter && year == $year{_user_filter(user_id)}][0] {{ {REPORT_FIELDS} }}',
+        _with_user({"quarter": quarter, "year": year}, user_id),
     )
     return results or None
 
 
-async def fetch_reports_by_year(year: int) -> list[dict]:
+async def fetch_reports_by_year(year: int, user_id: str | None = None) -> list[dict]:
     return await groq_query(
-        f'*[_type == "report" && year == $year] | order(quarter asc) {{ {REPORT_FIELDS} }}',
-        {"year": year},
+        f'*[_type == "report" && year == $year{_user_filter(user_id)}] | order(quarter asc) {{ {REPORT_FIELDS} }}',
+        _with_user({"year": year}, user_id),
     )
 
 
-async def fetch_all_reports() -> list[dict]:
+async def fetch_all_reports(user_id: str | None = None) -> list[dict]:
+    if user_id:
+        return await groq_query(
+            f'*[_type == "report" && user._ref == $userId] | order(year asc, quarter asc) {{ {REPORT_FIELDS} }}',
+            {"userId": user_id},
+        )
     return await groq_query(
         f'*[_type == "report"] | order(year asc, quarter asc) {{ {REPORT_FIELDS} }}'
     )

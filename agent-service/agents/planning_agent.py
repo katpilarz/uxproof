@@ -1025,10 +1025,17 @@ class PlanningAgent:
             or "all periods" in period_lower
             or not any(period_lower.startswith(q) for q in ("q1", "q2", "q3", "q4"))
         )
+        # Year plans are keyed per-user when the context is user-scoped
+        # (slideplan_year_<year>_<userSuffix>), so two users' "2025 deck"
+        # requests never overwrite each other. Quarter plans inherit the
+        # user's reportId (report_<userHash>_<qn>_<year>), which is
+        # already user-specific.
+        user_id = (ctx.get("metadata") or {}).get("user_id") or ""
+        user_suffix = f"_{user_id.removeprefix('user_')}" if user_id else ""
         if is_year_scope:
             year_match = re.search(r"\b(20\d{2})\b", period)
             if year_match:
-                doc_id = f"slideplan_year_{year_match.group(1)}"
+                doc_id = f"slideplan_year_{year_match.group(1)}{user_suffix}"
             else:
                 doc_id = f"slideplan_{report_id}"
         else:

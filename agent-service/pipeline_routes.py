@@ -67,6 +67,10 @@ class PipelineRunRequest(BaseModel):
         default_factory=lambda: ["planning"],
         description="Which downstream agents to invoke. Always include 'planning' for presentations.",
     )
+    user_id: Optional[str] = Field(
+        None,
+        description="Sanity user _id — scopes every report fetch (and the year-plan _id) to this owner.",
+    )
 
     @field_validator("quarter")
     @classmethod
@@ -123,6 +127,7 @@ async def run_pipeline(req: PipelineRunRequest) -> PipelineRunResponse:
         "mode":    req.mode,
         "year":    req.year,
         "quarter": req.quarter,
+        "user_id": req.user_id,
     }
     task = (
         f"Generate full-year presentation for {req.year}"
@@ -146,7 +151,8 @@ async def run_pipeline(req: PipelineRunRequest) -> PipelineRunResponse:
     slide_plan_id: Optional[str] = None
     if state.slide_plan:
         if req.mode == "year":
-            slide_plan_id = f"slideplan_year_{req.year}"
+            suffix = f"_{req.user_id.removeprefix('user_')}" if req.user_id else ""
+            slide_plan_id = f"slideplan_year_{req.year}{suffix}"
         else:
             primary  = (state.context or {}).get("primary") or {}
             report_id = primary.get("report_id", "unknown")
