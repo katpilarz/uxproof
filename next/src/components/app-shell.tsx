@@ -20,6 +20,7 @@ import { MotionConfig } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { TopBar }             from '@/components/top-bar';
 import { SettingsDialog }     from '@/components/settings-dialog';
+import { ProfileDialog }      from '@/components/profile-dialog';
 import { ChatHistorySidebar } from '@/components/chat-history-sidebar';
 import { LoginScreen }        from '@/components/login-screen';
 import { Toaster }            from '@/components/toaster';
@@ -112,6 +113,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           open={settingsOpen}
           onOpenChange={(o) => (o ? openSettings() : closeSettings())}
         />
+
+        {/* Account panel — reads its own open state from the auth slice. */}
+        <ProfileDialog />
       </div>
     </MotionConfig>
   );

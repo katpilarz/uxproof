@@ -14,11 +14,15 @@
  *     list scans chronologically instead of as a flat wall of rows.
  *   - Row hierarchy inverted: the conversation preview is the primary
  *     line (it's what users recognise), quarter + time are metadata.
+ *
+ * Rows can be renamed in place: the pencil turns the title into an input
+ * (Enter saves, Escape cancels). A saved name replaces the message
+ * preview; clearing it falls back to the preview again.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { X, MessageSquare, Plus, Loader2, Trash2 } from 'lucide-react';
+import { X, MessageSquare, Plus, Loader2, Trash2, Pencil, Check } from 'lucide-react';
 import { Button }     from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn }         from '@/lib/utils';
@@ -35,6 +39,7 @@ import {
   useSelectSession,
   useNewSession,
   useDeleteSession,
+  useRenameSession,
 } from '@/store';
 
 type SessionRow = ReturnType<typeof useSessions>[number];
@@ -60,6 +65,12 @@ export function ChatHistorySidebar() {
   const selectSession = useSelectSession();
   const newSession    = useNewSession();
   const deleteSession = useDeleteSession();
+  const renameSession = useRenameSession();
+
+  // sessionId of the row currently being renamed, plus its draft text.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Load sessions whenever sidebar opens
   useEffect(() => {
@@ -68,15 +79,46 @@ export function ChatHistorySidebar() {
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Escape closes the sidebar
+  // Escape closes the sidebar — unless a row is being renamed, where it
+  // cancels that edit first (the input's own onKeyDown does the cancel;
+  // this guard just stops the sidebar closing out from under it).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeHistory();
+      if (e.key === 'Escape' && !renamingId) closeHistory();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, closeHistory]);
+  }, [open, closeHistory, renamingId]);
+
+  // Focus (and select) the rename field as soon as a row enters edit mode.
+  useEffect(() => {
+    if (!renamingId) return;
+    const input = renameInputRef.current;
+    input?.focus();
+    input?.select();
+  }, [renamingId]);
+
+  // Renaming is per-row state; closing the sidebar must not leave a row
+  // stuck in edit mode the next time it opens. Adjusted during render
+  // rather than in an effect — React re-runs this component immediately
+  // instead of committing a frame with the stale edit still open.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) setRenamingId(null);
+  }
+
+  const startRename = (sessionId: string, currentTitle: string) => {
+    setRenamingId(sessionId);
+    setDraftTitle(currentTitle);
+  };
+
+  const commitRename = async (sessionId: string) => {
+    const next = draftTitle;
+    setRenamingId(null);
+    await renameSession(sessionId, next);
+  };
 
   // The session slice updates the URL with a shallow pushState, which only
   // works while a chat surface is already rendered ('/' or '/chat/[id]').
@@ -196,68 +238,125 @@ export function ChatHistorySidebar() {
                 </p>
                 <div className="space-y-0.5">
                   {items.map((s) => {
-                    const isActive = s.sessionId === activeId;
-                    // Previews are raw message text — strip markdown markers
-                    // so titles read as plain sentences.
+                    const isActive   = s.sessionId === activeId;
+                    const isRenaming = s.sessionId === renamingId;
+                    // A name the user chose wins; otherwise fall back to the
+                    // last message. Previews are raw message text — strip
+                    // markdown markers so titles read as plain sentences.
                     const title =
+                      s.customTitle?.trim() ||
                       s.preview?.replace(/[*_`#]/g, '').trim() ||
                       s.quarter ||
                       'New conversation';
-                    const when     = formatDistanceToNowStrict(new Date(s.createdAt), { addSuffix: true });
+                    const when = formatDistanceToNowStrict(new Date(s.createdAt), { addSuffix: true });
 
                     return (
-                      // Wrapper div, not nested <button>s — the delete
-                      // action is an absolutely-positioned sibling of the
-                      // row button so the markup stays valid.
+                      // Wrapper div, not nested <button>s — the row actions
+                      // are absolutely-positioned siblings of the row button
+                      // so the markup stays valid.
                       <div key={s.sessionId} className="relative group">
                         <button
                           onClick={() => handleSelect(s.sessionId)}
                           aria-current={isActive ? 'true' : undefined}
+                          disabled={isRenaming}
                           className={cn(
-                            'w-full max-w-full text-left pl-2.5 pr-8 py-2 rounded-lg border transition-colors duration-150 overflow-hidden',
+                            'w-full max-w-full text-left pl-2.5 py-2 rounded-lg border transition-colors duration-150 overflow-hidden',
+                            isRenaming ? 'pr-9' : 'pr-14',
                             isActive
                               ? 'bg-violet-500/10 border-violet-500/40'
                               : 'bg-transparent border-transparent hover:bg-muted/60',
                           )}
                         >
-                          {/* Primary line: what the conversation was about */}
-                          <p
-                            className={cn(
-                              'text-xs truncate leading-snug',
-                              isActive
-                                ? 'text-violet-700 dark:text-violet-300 font-medium'
-                                : 'text-foreground',
-                            )}
-                          >
-                            {title}
-                          </p>
+                          {/* Primary line: the conversation's name */}
+                          {isRenaming ? (
+                            <input
+                              ref={renameInputRef}
+                              value={draftTitle}
+                              onChange={(e) => setDraftTitle(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onBlur={() => commitRename(s.sessionId)}
+                              onKeyDown={(e) => {
+                                e.stopPropagation();
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  commitRename(s.sessionId);
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  setRenamingId(null);
+                                }
+                              }}
+                              maxLength={120}
+                              aria-label="Conversation name"
+                              placeholder="Name this conversation"
+                              className="w-full bg-transparent text-xs leading-snug text-foreground outline-none border-b border-violet-500/60 pb-0.5"
+                            />
+                          ) : (
+                            <p
+                              className={cn(
+                                'text-xs truncate leading-snug',
+                                isActive
+                                  ? 'text-violet-700 dark:text-violet-300 font-medium'
+                                  : 'text-foreground',
+                              )}
+                            >
+                              {title}
+                            </p>
+                          )}
                           {/* Metadata line: quarter tag + relative time */}
                           <p className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground/60 truncate">
                             {s.quarter && (
                               <span className="font-mono uppercase tracking-wide">{s.quarter}</span>
                             )}
                             {s.quarter && <span aria-hidden="true">·</span>}
-                            <span>{when}</span>
+                            <span>{isRenaming ? 'Enter to save · Esc to cancel' : when}</span>
                           </p>
                         </button>
 
-                        {/* Delete conversation — removes it from Sanity too;
-                            confirmed via toast (session slice). */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteSession(s.sessionId);
-                          }}
-                          aria-label={`Delete conversation “${title}”`}
-                          title="Delete conversation"
-                          className={cn(
-                            'absolute right-1.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md',
-                            'text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-colors',
-                            'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-                          )}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
+                        {/* Row actions. While renaming, the only action is
+                            "save" — mousedown (not click) so it fires before
+                            the input's blur tears the field down. */}
+                        {isRenaming ? (
+                          <button
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              commitRename(s.sessionId);
+                            }}
+                            aria-label="Save conversation name"
+                            title="Save name (Enter)"
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                          >
+                            <Check className="size-3.5" />
+                          </button>
+                        ) : (
+                          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                            {/* Rename — edits in place, saved via PATCH */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startRename(s.sessionId, s.customTitle ?? '');
+                              }}
+                              aria-label={`Rename conversation “${title}”`}
+                              title="Rename conversation"
+                              className="size-6 grid place-items-center rounded-md text-muted-foreground/50 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                            >
+                              <Pencil className="size-3.5" />
+                            </button>
+
+                            {/* Delete conversation — removes it from Sanity
+                                too; confirmed via toast (session slice). */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteSession(s.sessionId);
+                              }}
+                              aria-label={`Delete conversation “${title}”`}
+                              title="Delete conversation"
+                              className="size-6 grid place-items-center rounded-md text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

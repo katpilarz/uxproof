@@ -51,11 +51,24 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   `app/icon.svg`, and violet/emerald/rose status accents across chrome
   components. The monochrome rule above applies to the deck template only —
   never strip colour from the app UI.
-- **Lightweight per-user auth.** Signing in is claiming an email identity (no
-  password — internal tool): `/api/auth/*` + `next/src/lib/auth.ts` set an
-  HMAC-signed httpOnly cookie, users live in Sanity as `user` documents, and
-  chat sessions / presentations carry an owner reference. Every data API route
-  resolves the user server-side via `getCurrentUser()` and scopes queries to it.
+- **Lightweight per-user auth, password-protected.** Accounts are email +
+  password: `/api/auth/*` + `next/src/lib/auth.ts` hash the password with
+  scrypt (`node:crypto` — no bcrypt/argon dependency, no external service) and
+  set an HMAC-signed httpOnly cookie. Users live in Sanity as `user` documents
+  and chat sessions / files / presentations carry an owner reference. Every
+  data API route resolves the user server-side via `getCurrentUser()` and
+  scopes queries to it. Rules that must hold:
+  - The scrypt digest lives only in `user.passwordHash` and never leaves the
+    server — `toAuthUser()` is the only shape a client may receive.
+  - `/api/auth/register` creates accounts; `/api/auth/login` only verifies
+    them. Login must never auto-create, so an email typo is refused rather
+    than answered with an empty workspace.
+  - Sign-in failures return one message for "no such account" and "wrong
+    password" alike — don't make the route an account-enumeration oracle.
+  - Accounts predating passwords have no `passwordHash` and adopt one on
+    their next sign-in. Keep that migration path working.
+  - Changing a password requires the current one even with a valid session.
+  - Email is not editable: it derives the deterministic user `_id`.
   Don't add cloud auth providers; keep it cookie + Sanity only.
 - **All research data is user-uploaded — there is no global dataset.** Users add
   files via the chat **+** button (`/api/files`): CSV/JSON rows carrying
@@ -78,10 +91,27 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   `_id`s (`slideplan_year_<year>_<userSuffix>`). Direct service calls without
   a `user_id` fall back to global queries — keep the app side always passing
   it.
+- **Users own their data, including removing it.** Conversations can be renamed
+  and deleted, uploaded files and generated presentations deleted, all from the
+  UI. Every one of those routes verifies the document's `user._ref` against
+  `getCurrentUser()` FIRST and answers 404 otherwise — never trust an id from
+  the client. Deleting a file also deletes the `report` documents it created,
+  minus any period another upload still supplies
+  (`orphanedPeriodsForFile`): the app is upload-grounded, so a report with no
+  source file would keep feeding decks numbers that nothing stands behind.
+  Deleting a presentation also unlinks its rendered `.pptx`. Destructive
+  actions are confirmed in the UI before they run.
+
 - **Local-only inference is a product feature.** Client research data never leaves the
   machine. Do not introduce cloud LLM calls or send research data to external services.
 - **No orchestration frameworks.** The pipeline is deliberately hand-rolled (AutoGen
   was removed as an unused dependency). Don't reintroduce agent frameworks.
+- **Confirmations appear beneath the profile avatar.** The toast stack
+  (`components/toaster.tsx`) is anchored top-right under the avatar — not
+  top-centre — so every confirmation lands in the same column as the account
+  menu, the profile panel and the settings panel. Route all action feedback
+  through `showToast` rather than inventing per-view banners.
+
 - **Next.js server/client convention:** every file under `next/src/app/` that is a
   page or layout stays a **server component** (no `'use client'` — SSR is the
   default); every component under `next/src/components/` carries `'use client'`.

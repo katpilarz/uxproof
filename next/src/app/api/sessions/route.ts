@@ -21,7 +21,8 @@ export async function GET() {
       `*[_type == "chatSession" && user._ref == $userId] | order(createdAt desc)[0..49]{
         "sessionId":    sessionId,
         "id":           sessionId,
-        "title":        coalesce(quarter, sessionId),
+        "title":        coalesce(title, quarter, sessionId),
+        "customTitle":  title,
         quarter,
         createdAt,
         "preview":      messages[-1].content,

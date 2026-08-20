@@ -47,6 +47,7 @@ import {
   getSlidePlanById,
   getSlidePlanForPeriod,
   getSlidePlanForYear,
+  countUserReportsForPeriod,
   logSlidePlanShape,
   savePresentation,
   getPresentationsForUser,
@@ -189,6 +190,40 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: `Invalid year "${year}". Expected a year between 2000 and 2100.` },
           { status: 400 },
+        );
+      }
+    }
+
+    // ── 0b. Grounding precondition: is there any source data at all? ─────
+    //
+    // Every number in a deck must come from an uploaded report. The
+    // pipeline does NOT enforce that: asked about a period with no
+    // reports, it still returns a complete plan with model-authored SUS
+    // scores and a full trend chart. And getSlidePlanForYear() resolves
+    // the year plan by _id alone, so a plan built earlier outlives the
+    // reports it was built from.
+    //
+    // So the question "does the user still own data for this period?" has
+    // to be asked here, before any plan is fetched or built. It matters
+    // most right after someone deletes an uploaded file: without this,
+    // the very next deck request would answer with invented numbers.
+    //
+    // Only checked when the request names a period — reportId/slidePlanId
+    // requests are already resolved against owned documents.
+    if (year !== undefined) {
+      const periodQuarter = scope === 'year' ? undefined : quarter;
+      const owned = await countUserReportsForPeriod(user.id, Number(year), periodQuarter);
+      if (!owned) {
+        const label = periodQuarter ? `${periodQuarter} ${year}` : `${year}`;
+        console.warn(`[presentations] no owned reports for ${label}; refusing to render`);
+        return NextResponse.json(
+          {
+            error:
+              `There's no research data for ${label} in your workspace, so there's ` +
+              `nothing to build a deck from. Upload a report covering ${label} with ` +
+              `the + button in chat, then try again.`,
+          },
+          { status: 409 },
         );
       }
     }

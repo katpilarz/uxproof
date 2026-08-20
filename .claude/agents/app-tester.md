@@ -46,14 +46,15 @@ Note the Next.js 16 specifics: `cookies()` and route `params` are async, middlew
 
 Map these before writing any test. They are the application:
 
-1. **Authentication** — email-identity sign-in (no password), HMAC-signed httpOnly cookie, avatar upload to Sanity, logout, `/api/auth/login|logout|me`
+1. **Authentication** — email + password sign-in (scrypt digest, server-only), account creation, HMAC-signed httpOnly cookie, avatar upload to Sanity, profile edits (name/photo/password), logout, `/api/auth/login|register|profile|password|logout|me`. Check: login never auto-creates an account; wrong-password and unknown-email answer identically; the digest never appears in any response; changing a password requires the current one; legacy accounts with no `passwordHash` adopt one on next sign-in
 2. **Per-user isolation** — every data route (`/api/sessions`, `/api/files`, `/api/presentations`, `/api/chat`) resolves the user server-side and scopes queries to `user._ref`
 3. **File upload & parsing** — `/api/files`: CSV/JSON with `quarter`+`year`+`susScore` become user-owned `report` docs; TXT/MD stored as summarized reference context
 4. **Chat intents** — casual / data / deep / presentation classification; the no-data gate (empty workspace → asked to upload, never shown other users' numbers)
 5. **Grounding guarantees** — deterministic answers built from Sanity data; the Ollama conversational layer has a numeric guardrail (numbers not present in the facts → rewrite discarded)
 6. **Deck generation** — `/api/presentations` renders a fixed 8-slide .pptx; strictly monochrome except the colour cover photo
-7. **Session lifecycle** — create, restore from history, delete (removes the Sanity doc)
-8. **UI shell** — login screen, chat input (+ upload, pill input), history sidebar, avatar dropdown (settings, logout), toast notifications with countdown
+7. **Session lifecycle** — create, restore from history, rename (`PATCH /api/sessions/[id]`, falls back to the message preview when cleared), delete (removes the Sanity doc)
+7b. **Deleting owned data** — `DELETE /api/files/[id]` and `/api/presentations/[id]`. Check ownership is enforced (another user's id → 404, never a deletion), that deleting a file removes the reports it alone sourced but KEEPS periods another upload still supplies, and that deleting a deck unlinks its .pptx
+8. **UI shell** — login screen (sign in / create account modes), chat input (+ upload, pill input), history sidebar with inline rename, avatar dropdown (profile, settings, logout), profile dialog, confirmation dialogs on destructive actions, toast notifications with countdown anchored beneath the avatar (top-right, NOT top-centre)
 
 ---
 

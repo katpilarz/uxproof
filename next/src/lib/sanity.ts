@@ -131,6 +131,131 @@ export async function deleteChatSession(sessionId: string): Promise<boolean> {
   return (res?.results?.length ?? 0) > 0;
 }
 
+/**
+ * Give a conversation a user-chosen name. An empty title clears it, so
+ * the sidebar falls back to the last message again. Ownership is checked
+ * by the API route before calling this.
+ */
+export async function renameChatSession(sessionId: string, title: string) {
+  const patch = writeClient.patch(`chatSession_${sessionId}`);
+  return (title ? patch.set({ title }) : patch.unset(['title'])).commit();
+}
+
+// ── Deletion helpers (ownership is verified by the API routes) ───────────────
+
+/** Remove one generated presentation document. */
+export async function deletePresentationDoc(id: string): Promise<boolean> {
+  const res = await writeClient.delete(id);
+  return (res?.results?.length ?? 0) > 0;
+}
+
+/** Remove one uploaded-file document. */
+export async function deleteUserFileDoc(id: string): Promise<boolean> {
+  const res = await writeClient.delete(id);
+  return (res?.results?.length ?? 0) > 0;
+}
+
+/**
+ * Periods (e.g. "Q3 2025") that would be left without a source file if
+ * `fileId` were deleted — i.e. the periods that file created and no other
+ * upload of this user still claims. Deleting the file deletes exactly
+ * these reports: an orphaned report would keep feeding decks with numbers
+ * whose source document is gone, and a shared period must survive.
+ */
+export async function orphanedPeriodsForFile(
+  userId: string,
+  fileId: string,
+  periods: string[],
+): Promise<string[]> {
+  if (!periods.length) return [];
+  const stillClaimed: string[] = (await client?.fetch(
+    `array::unique(*[_type == "userFile" && user._ref == $userId && _id != $fileId].reportsCreated[])`,
+    { userId, fileId },
+  )) ?? [];
+  const claimed = new Set(stillClaimed.filter(Boolean));
+  return periods.filter(p => !claimed.has(p));
+}
+
+/**
+ * How many reports this user owns for a period. Pass a quarter for
+ * quarter-scope, omit it to count the whole year.
+ *
+ * The deck routes use this as a grounding precondition: with no reports,
+ * the pipeline will still happily produce a plan (with model-authored SUS
+ * numbers), so "does the source data exist?" has to be asked before the
+ * plan is trusted — a plan is not evidence that anything was measured.
+ */
+export async function countUserReportsForPeriod(
+  userId:   string,
+  year:     number,
+  quarter?: string,
+): Promise<number> {
+  return (await client?.fetch(
+    `count(*[_type == "report" && user._ref == $userId && year == $year${
+      quarter ? ' && quarter == $quarter' : ''
+    }])`,
+    quarter ? { userId, year, quarter } : { userId, year },
+  )) ?? 0;
+}
+
+/**
+ * Delete a user's research for the given periods: the `report` documents
+ * AND the analysis the pipeline derived from them.
+ *
+ * Removing only the reports is not enough. The deck is rendered from a
+ * `slidePlan`, and getSlidePlanForYear() resolves the year-scope plan by
+ * _id alone — no report lookup — so a surviving `slideplan_year_<year>`
+ * would keep producing a full deck of numbers whose source file the user
+ * deleted. Same for the `executiveIntelligence` doc the extraction agent
+ * writes. Both are derived artifacts: the orchestrator rebuilds them on
+ * demand from whatever reports still exist.
+ *
+ * Every _id here mirrors the scheme its writer uses — upsertUserReport()
+ * above, `intelligence_<reportId>` (extraction_agent.py) and
+ * `slideplan_<reportId>` / `slideplan_year_<year>_<userSuffix>`
+ * (pipeline_routes.py) — so this only ever touches this user's documents.
+ */
+export async function deleteUserReportsForPeriods(
+  userId: string,
+  periods: string[],
+): Promise<number> {
+  const suffix = userId.replace(/^user_/, '');
+  const years  = new Set<string>();
+  let deleted = 0;
+
+  /** Best-effort delete — a missing derived doc is normal, not a failure. */
+  const drop = async (id: string) => {
+    try {
+      const res = await writeClient.delete(id);
+      deleted += res?.results?.length ?? 0;
+    } catch (e) {
+      console.warn('[sanity] delete failed for', id, e);
+    }
+  };
+
+  for (const period of periods) {
+    const match = /^(Q[1-4])\s+(\d{4})$/i.exec(period.trim());
+    if (!match) continue;
+    const [, rawQuarter, year] = match;
+    const reportId = `report_${suffix}_${rawQuarter.toLowerCase()}_${year}`;
+    years.add(year);
+
+    // Derived analysis first, source report last — so a failure part-way
+    // through never leaves a plan pointing at a report that's already gone.
+    await drop(`slideplan_${reportId}`);
+    await drop(`intelligence_${reportId}`);
+    await drop(reportId);
+  }
+
+  // The year-scope plan aggregated every quarter of that year, so losing
+  // any one of them makes it stale.
+  for (const year of years) {
+    await drop(`slideplan_year_${year}_${suffix}`);
+  }
+
+  return deleted;
+}
+
 // ── User file directory (uploaded reports/files) ─────────────────────────────
 //
 // Files uploaded through the chat "+" button. Each `userFile` doc stores the

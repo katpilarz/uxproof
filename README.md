@@ -31,8 +31,10 @@ never leaves the machine.
 
 ## How it works
 
-1. **Sign in** — claiming an email identity (HMAC-signed cookie, users in
-   Sanity; no password, internal tool).
+1. **Sign in** — email + password (scrypt via `node:crypto`, HMAC-signed
+   httpOnly cookie, users in Sanity). Create an account or sign in from the
+   same screen; name, photo and password are editable later from the profile
+   panel under the avatar.
 2. **Upload** research files via the chat's **+** button (CSV, JSON, PDF,
    TXT, Markdown). Structured rows (quarter + year + SUS score) parse
    deterministically into user-owned `report` documents; prose documents

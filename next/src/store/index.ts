@@ -64,12 +64,22 @@ export const useSettingsOpen    = () => useStore(s => s.settingsOpen);
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
-export const useAuthUser     = () => useStore(s => s.user);
-export const useAuthLoading  = () => useStore(s => s.authLoading);
-export const useLoginPending = () => useStore(s => s.loginPending);
-export const useCheckAuth    = () => useStore(s => s.checkAuth);
-export const useLogin        = () => useStore(s => s.login);
-export const useLogout       = () => useStore(s => s.logout);
+export const useAuthUser       = () => useStore(s => s.user);
+export const useAuthLoading    = () => useStore(s => s.authLoading);
+export const useLoginPending   = () => useStore(s => s.loginPending);
+export const useCheckAuth      = () => useStore(s => s.checkAuth);
+export const useLogin          = () => useStore(s => s.login);
+export const useRegister       = () => useStore(s => s.register);
+export const useLogout         = () => useStore(s => s.logout);
+
+// ── Profile (account dialog under the avatar) ─────────────────────────────────
+
+export const useProfileOpen    = () => useStore(s => s.profileOpen);
+export const useProfilePending = () => useStore(s => s.profilePending);
+export const useOpenProfile    = () => useStore(s => s.openProfile);
+export const useCloseProfile   = () => useStore(s => s.closeProfile);
+export const useUpdateProfile  = () => useStore(s => s.updateProfile);
+export const useChangePassword = () => useStore(s => s.changePassword);
 
 // ── Toasts ─────────────────────────────────────────────────────────────────────
 
@@ -84,6 +94,7 @@ export const useInitSession   = () => useStore(s => s.initSession);
 export const useSelectSession = () => useStore(s => s.selectSession);
 export const useLoadSessions  = () => useStore(s => s.loadSessions);
 export const useDeleteSession = () => useStore(s => s.deleteSession);
+export const useRenameSession = () => useStore(s => s.renameSession);
 export const useOpenHistory   = () => useStore(s => s.openHistory);
 export const useCloseHistory  = () => useStore(s => s.closeHistory);
 export const useOpenSettings  = () => useStore(s => s.openSettings);

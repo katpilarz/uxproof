@@ -67,6 +67,9 @@ export interface ChatSession {
   id:            string;
   sessionId:     string;
   title:         string;
+  /** The user's own name for the conversation, when they've set one.
+   *  Undefined means the sidebar falls back to the last message text. */
+  customTitle?:  string;
   quarter?:      string;
   createdAt:     string;
   preview?:      string;
@@ -89,6 +92,7 @@ export interface SessionSliceActions {
   selectSession: (id: string) => Promise<void>;
   loadSessions:  () => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
+  renameSession: (id: string, title: string) => Promise<boolean>;
   openHistory:   () => void;
   closeHistory:  () => void;
   openSettings:  () => void;
@@ -200,6 +204,46 @@ export const createSessionSlice: StateCreator<
     } catch (e) {
       console.warn('[session-slice] deleteSession error:', e);
       get().showToast('Could not delete the conversation', { variant: 'error' });
+    }
+  },
+
+  renameSession: async (id: string, title: string) => {
+    const trimmed = title.trim().replace(/\s+/g, ' ');
+    const previous = get().sessions.find(x => x.sessionId === id)?.customTitle;
+    if (trimmed === (previous ?? '')) return true;
+
+    // Optimistic — the sidebar row swaps to the new name immediately and
+    // rolls back if the server refuses.
+    set(s => {
+      const row = s.sessions.find(x => x.sessionId === id);
+      if (row) row.customTitle = trimmed || undefined;
+    });
+
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ title: trimmed }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        set(s => {
+          const row = s.sessions.find(x => x.sessionId === id);
+          if (row) row.customTitle = previous;
+        });
+        get().showToast(data.error || 'Could not rename the conversation', { variant: 'error' });
+        return false;
+      }
+      get().showToast(trimmed ? 'Conversation renamed' : 'Name cleared', { variant: 'success' });
+      return true;
+    } catch (e) {
+      console.warn('[session-slice] renameSession error:', e);
+      set(s => {
+        const row = s.sessions.find(x => x.sessionId === id);
+        if (row) row.customTitle = previous;
+      });
+      get().showToast('Could not rename the conversation', { variant: 'error' });
+      return false;
     }
   },
 
