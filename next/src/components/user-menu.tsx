@@ -4,12 +4,14 @@
  * components/user-menu.tsx
  *
  * Top-right avatar for the signed-in user. Clicking it opens a dropdown
- * with the account identity and a "Log out" action; logging out clears
- * the session cookie, resets per-user state, and confirms via toast
- * (handled in the auth slice).
+ * with the account identity, "Profile" (name, photo and password),
+ * "Settings", and "Log out"; logging out clears the session cookie,
+ * resets per-user state, and confirms via toast (handled in the auth
+ * slice). Every confirmation toast is anchored directly beneath this
+ * avatar — see components/toaster.tsx.
  */
 
-import { LogOut, Settings } from 'lucide-react';
+import { LogOut, Settings, UserRound } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -18,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { useAuthUser, useLogout, useOpenSettings } from '@/store';
+import { useAuthUser, useLogout, useOpenSettings, useOpenProfile } from '@/store';
 
 function initialsFor(email: string, name?: string): string {
   const source = (name || email.split('@')[0] || '?').trim();
@@ -33,6 +35,7 @@ export function UserMenu() {
   const user         = useAuthUser();
   const logout       = useLogout();
   const openSettings = useOpenSettings();
+  const openProfile  = useOpenProfile();
 
   if (!user) return null;
 
@@ -65,6 +68,12 @@ export function UserMenu() {
           </div>
         </div>
         <DropdownMenuSeparator />
+        {/* Profile — display name, photo and password. Opens anchored
+            below the avatar, like Settings. */}
+        <DropdownMenuItem onSelect={() => openProfile()}>
+          <UserRound />
+          Profile
+        </DropdownMenuItem>
         {/* Settings lives here now (moved out of the chat input); the
             panel opens anchored below the avatar — see settings-dialog. */}
         <DropdownMenuItem onSelect={() => openSettings()}>

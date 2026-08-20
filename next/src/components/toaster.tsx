@@ -3,8 +3,10 @@
 /**
  * components/toaster.tsx
  *
- * Renders the toast stack from the toast slice at the top-center of the
- * viewport (above the top bar). Each toast:
+ * Renders the toast stack from the toast slice directly BENEATH the
+ * profile avatar in the top-right corner — confirmations appear where the
+ * account and its actions live, not across the middle of the top bar
+ * where they cover the app's own chrome. Each toast:
  *   - confirms an action ("Conversation deleted", "Signed in as …")
  *   - shows a circular countdown of the time left before it auto-dismisses
  *     (lifetime is capped at 10s in the slice), with the seconds remaining
@@ -104,9 +106,9 @@ function Toast({ toast }: { toast: ToastItem }) {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: -16, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -12, scale: 0.97 }}
+      initial={{ opacity: 0, y: -10, x: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, x: 8, scale: 0.97 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
       role="status"
       aria-live="polite"
@@ -115,7 +117,7 @@ function Toast({ toast }: { toast: ToastItem }) {
       className={cn(
         'pointer-events-auto flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-xl',
         'bg-background border border-border shadow-lg shadow-black/10',
-        'min-w-[240px] max-w-[min(92vw,420px)]',
+        'min-w-[240px] max-w-[min(92vw,360px)]',
       )}
     >
       <Icon className={cn('size-4 shrink-0', VARIANT_ICON_CLASS[toast.variant])} />
@@ -135,7 +137,9 @@ export function Toaster() {
   return (
     <div
       aria-label="Notifications"
-      className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none"
+      // top-16 clears the h-14 top bar; right-4 lines the stack up with the
+      // avatar's own right edge, so toasts read as coming from it.
+      className="fixed top-16 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none"
     >
       <AnimatePresence mode="popLayout">
         {toasts.map(t => <Toast key={t.id} toast={t} />)}

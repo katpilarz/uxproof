@@ -10,6 +10,10 @@
  *   stat cards computed from the same data. Download opens the stored
  *   downloadUrl; decks generated before the last server restart may have
  *   expired since /downloads files are ephemeral.
+ *
+ *   Each card can be deleted (confirmed first — it removes the Sanity
+ *   record and the rendered .pptx, and can't be undone). Deletion is
+ *   confirmed by a toast beneath the profile avatar.
  */
 
 import { useEffect, useState } from 'react';
@@ -20,11 +24,14 @@ import {
   BarChart,
   Layers,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import PowerPointIcon from './ui/powerpoint-icon';
+import { ConfirmDialog } from './confirm-dialog';
+import { useShowToast } from '@/store';
 
 type DashboardProps = {
   onChatClick: () => void;
@@ -66,8 +73,12 @@ function isThisCalendarQuarter(iso?: string): boolean {
 }
 
 export function Dashboard({ onChatClick }: DashboardProps) {
+  const showToast = useShowToast();
+
   const [presentations, setPresentations] = useState<PresentationRow[]>([]);
   const [loading,       setLoading]       = useState(true);
+  /** The deck awaiting delete confirmation, or null. */
+  const [pendingDelete, setPendingDelete] = useState<PresentationRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +91,25 @@ export function Dashboard({ onChatClick }: DashboardProps) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  const handleDelete = async (presentation: PresentationRow) => {
+    const label = presentation.title || presentation.quarter || 'Presentation';
+    try {
+      const res  = await fetch(`/api/presentations/${encodeURIComponent(presentation._id)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        showToast(data.error || 'Could not delete the presentation', { variant: 'error' });
+        return;
+      }
+      setPresentations(prev => prev.filter(p => p._id !== presentation._id));
+      showToast(`Deleted “${label}”`, { variant: 'success' });
+    } catch (e) {
+      console.warn('[dashboard] delete failed:', e);
+      showToast('Could not delete the presentation', { variant: 'error' });
+    }
+  };
 
   const totalSlides    = presentations.reduce((sum, p) => sum + (p.slidesCount ?? 0), 0);
   const thisQuarter    = presentations.filter(p => isThisCalendarQuarter(p.generatedDate)).length;
@@ -172,17 +202,27 @@ export function Dashboard({ onChatClick }: DashboardProps) {
                     </div>
                   </div>
 
-                  {/* Hover overlay */}
-                  {presentation.downloadUrl && (
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                  {/* Hover overlay — download and delete */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus-within:bg-black/30">
+                    {presentation.downloadUrl && (
                       <Button size="sm" variant="secondary" asChild>
                         <a href={presentation.downloadUrl} download>
                           <Download className="size-4 mr-1" />
                           Download
                         </a>
                       </Button>
-                    </div>
-                  )}
+                    )}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setPendingDelete(presentation)}
+                      aria-label={`Delete presentation ${presentation.title || presentation.quarter || ''}`.trim()}
+                      title="Delete presentation"
+                      className="text-red-600 hover:text-red-600 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="px-5 pt-5 pb-5">
@@ -272,6 +312,24 @@ export function Dashboard({ onChatClick }: DashboardProps) {
         )}
 
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
+        title="Delete this presentation?"
+        confirmLabel="Delete presentation"
+        description={
+          <>
+            <span className="font-medium text-foreground">
+              {pendingDelete?.title || pendingDelete?.quarter || 'This presentation'}
+            </span>{' '}
+            will be removed from your dashboard, along with the generated .pptx
+            file. The research data it was built from is not affected — you can
+            generate the deck again from chat.
+          </>
+        }
+        onConfirm={async () => { if (pendingDelete) await handleDelete(pendingDelete); }}
+      />
     </div>
   );
 }

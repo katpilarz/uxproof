@@ -12,6 +12,12 @@
  *     one opens a fresh chat session and automatically runs the request
  *     there ("Summarize the file …" / "Generate <period> presentation")
  *     via the store's pendingPrompt handoff.
+ *
+ * Each file can also be deleted. Because every number in the app is
+ * upload-grounded, deleting a file also deletes the research periods it
+ * created — unless another upload still supplies the same period. The
+ * confirmation names exactly which periods are going, and the result is
+ * confirmed by a toast beneath the profile avatar.
  */
 
 import { useEffect, useState } from 'react';
@@ -24,13 +30,15 @@ import {
   Sparkles,
   ChevronDown,
   Layers,
+  Trash2,
 } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { MarkdownMessage } from '@/components/markdown-message';
-import { useNewSession, useSetPendingPrompt } from '@/store';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useNewSession, useSetPendingPrompt, useShowToast } from '@/store';
 import { cn } from '@/lib/utils';
 
 interface UserFileRow {
@@ -58,10 +66,13 @@ export function FilesView() {
   const router           = useRouter();
   const newSession       = useNewSession();
   const setPendingPrompt = useSetPendingPrompt();
+  const showToast        = useShowToast();
 
   const [files,    setFiles]    = useState<UserFileRow[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  /** The file awaiting delete confirmation, or null. */
+  const [pendingDelete, setPendingDelete] = useState<UserFileRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +90,35 @@ export function FilesView() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const handleDelete = async (file: UserFileRow) => {
+    try {
+      const res  = await fetch(`/api/files/${encodeURIComponent(file._id)}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        showToast(data.error || 'Could not delete the file', { variant: 'error' });
+        return;
+      }
+      setFiles(prev => prev.filter(f => f._id !== file._id));
+      setExpanded(prev => {
+        const next = new Set(prev);
+        next.delete(file._id);
+        return next;
+      });
+      // Say what actually went, not just that something did — the research
+      // periods leaving matters more than the file row disappearing.
+      const removed: string[] = data.periodsRemoved ?? [];
+      showToast(
+        removed.length
+          ? `Deleted ${file.filename} and its ${removed.join(', ')} data`
+          : `Deleted ${file.filename}`,
+        { variant: 'success' },
+      );
+    } catch (e) {
+      console.warn('[files-view] delete failed:', e);
+      showToast('Could not delete the file', { variant: 'error' });
+    }
   };
 
   /** Open a fresh chat session and auto-run the given request there. */
@@ -199,6 +239,18 @@ export function FilesView() {
                     </Button>
                   </div>
 
+                  {/* Delete — removes the file and any research periods
+                      it alone supplied. Confirmed first. */}
+                  <Button
+                    variant="ghost" size="icon"
+                    onClick={() => setPendingDelete(file)}
+                    aria-label={`Delete ${file.filename}`}
+                    title="Delete file"
+                    className="shrink-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+
                   {/* Accordion control — very right of the header */}
                   <Button
                     variant="ghost" size="icon"
@@ -224,6 +276,33 @@ export function FilesView() {
           })}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
+        title="Delete this file?"
+        confirmLabel="Delete file"
+        description={
+          <>
+            <span className="font-medium text-foreground">{pendingDelete?.filename}</span>{' '}
+            will be removed permanently.
+            {(pendingDelete?.reportsCreated?.length ?? 0) > 0 ? (
+              <>
+                {' '}The research data extracted from it (
+                <span className="font-mono text-foreground">
+                  {pendingDelete!.reportsCreated!.join(', ')}
+                </span>
+                ) goes with it, so analyses and decks for those periods will no
+                longer have anything to stand on — unless another upload covers
+                the same period.
+              </>
+            ) : (
+              <> No research periods were extracted from it, so nothing else changes.</>
+            )}
+          </>
+        }
+        onConfirm={async () => { if (pendingDelete) await handleDelete(pendingDelete); }}
+      />
     </motion.div>
   );
 }
