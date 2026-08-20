@@ -36,12 +36,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 
-import {
-  generatePowerPoint,
-  loadSlidesFromPlan,
-  buildDefaultSlides,
-  SlideConfig,
-} from '@/lib/ppt-generator';
+import { generatePowerPoint, planToDeck, describeDeck } from '@/lib/ppt-generator';
 import {
   getSlidePlan,
   getSlidePlanById,
@@ -52,6 +47,8 @@ import {
   savePresentation,
   getPresentationsForUser,
 } from '@/lib/sanity';
+import { fetchReportGrounding } from '@/lib/services/report-query';
+import { writeClient } from '@/lib/sanity';
 import { getCurrentUser } from '@/lib/auth';
 import { downloadsDir } from '@/lib/downloads';
 
@@ -116,6 +113,30 @@ async function triggerOrchestrator(args: OrchestratorTriggerArgs): Promise<boole
     return false;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+
+/**
+ * The signed-in user's deck photograph as a data URI, or undefined to use
+ * the bundled one. Any failure falls back silently — a deck is still a
+ * deck without the user's own picture.
+ */
+async function fetchDeckPhoto(userId: string): Promise<string | undefined> {
+  try {
+    const url: string | null = await writeClient.fetch(
+      `*[_type == "user" && _id == $id][0].deckImage.asset->url`,
+      { id: userId },
+    );
+    if (!url) return undefined;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return undefined;
+    const buf  = Buffer.from(await res.arrayBuffer());
+    const type = res.headers.get('content-type') || 'image/jpeg';
+    return `data:${type};base64,${buf.toString('base64')}`;
+  } catch (e) {
+    console.warn('[presentations] deck photo unavailable, using the bundled one:', e);
+    return undefined;
   }
 }
 
@@ -286,11 +307,9 @@ export async function POST(request: NextRequest) {
     logSlidePlanShape(plan);
 
     // ── 2b. Refuse rather than ship a deck that isn't about anything ──────
-    // With no plan, buildDefaultSlides() renders a complete, professional
-    // -looking deck whose SUS headline is an em-dash and whose cover names
-    // a period nobody asked for. A 200 on that is a lie about the content;
-    // failing honestly lets the UI show its error state instead.
-    // (Defaults are still used below to pad a short plan to 8 slides.)
+    // Without a plan there is nothing to build from, and a deck of empty
+    // frames is a lie about the content. Failing honestly lets the UI show
+    // its error state instead.
     if (!plan) {
       console.warn('[presentations] no slide plan available; refusing to render a placeholder deck');
       return NextResponse.json(
@@ -304,16 +323,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 3. Sanity slidePlan → SlideConfig[] ───────────────────────────────
-    let slides: SlideConfig[] = loadSlidesFromPlan(plan);
-
-    // Enforce 8 slides, numbered 1..8
-    const defaults = buildDefaultSlides();
-    while (slides.length < 8) {
-      const fill = defaults[slides.length] ?? defaults[defaults.length - 1];
-      slides.push({ ...fill, number: slides.length + 1 });
-    }
-    slides = slides.slice(0, 8).map((s, i) => ({ ...s, number: i + 1 }));
 
     // ── 4. Build the deck ─────────────────────────────────────────────────
     // Strip "Full Year " prefix from any source so the PPT footer
@@ -328,10 +337,41 @@ export async function POST(request: NextRequest) {
       'UX Research Report'
     );
 
-    console.log('[presentations] rendering', slides.length, 'slides, label:', reportLabel);
+    // ── 3. Plan → deck ────────────────────────────────────────────────────
+    // The Dossier template is a library of slide types, not a fixed run:
+    // planToDeck() emits a slide only where the data for it exists, so the
+    // deck's length reflects what was actually measured.
+    // The plan can carry findings the report never recorded, so the deck is
+    // clipped to what the source data actually holds.
+    const grounding = year !== undefined
+      ? await fetchReportGrounding(user.id, Number(year), scope === 'year' ? undefined : quarter)
+      : undefined;
+    const deck = planToDeck(plan, reportLabel, grounding);
+
+    if (!deck.length) {
+      console.warn('[presentations] plan carried no usable content; refusing to render');
+      return NextResponse.json(
+        {
+          error:
+            'The analysis for that period has no figures or findings to build ' +
+            'slides from. Upload a fuller report and try again.',
+        },
+        { status: 503 },
+      );
+    }
+
+    console.log(
+      '[presentations] rendering', deck.length, 'slides:',
+      deck.map(d => d.kind).join(', '), '| label:', reportLabel,
+    );
+
+    // The user's own photograph, if they chose one. Fetched as bytes and
+    // inlined: pptxgenjs embeds a data URI reliably, whereas a remote path
+    // would make deck generation depend on the CDN being reachable.
+    const photo = await fetchDeckPhoto(user.id);
 
     const result = await Promise.race([
-      generatePowerPoint(slides, reportLabel),
+      generatePowerPoint(deck, reportLabel, { photo }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('pptx generation timed out after 60s')), 60_000)
       ),
@@ -344,7 +384,7 @@ export async function POST(request: NextRequest) {
       _type:         'presentation',
       title:         title || reportLabel,
       quarter:       quarter || reportLabel,
-      slidesCount:   slides.length,
+      slidesCount:   deck.length,
       status:        'completed',
       downloadUrl:   result.downloadUrl,
       generatedDate: new Date().toISOString(),
@@ -372,7 +412,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
-      slidesCount:   slides.length,
+      slidesCount:   deck.length,
+      // What was actually built, so the chat preview can show the real
+      // deck instead of a fixed row of placeholder tiles.
+      slides:        describeDeck(deck),
       generatedDate: result.generatedDate.toISOString(),
     });
 

@@ -358,6 +358,11 @@ class ExtractionAgent:
             ],
             "temperature": 0.1,
             "max_tokens":  2400,
+            # Reasoning models (qwen3.5 and friends) spend the token budget on a
+            # chain-of-thought and return an empty `content`, which would make
+            # every LLM step here fail validation and fall back to deterministic
+            # output. Ollama ignores this on non-reasoning models.
+            "reasoning_effort": "none",
         }
         async with httpx.AsyncClient(timeout=120) as client:
             r = await client.post(f"{OLLAMA_BASE}/v1/chat/completions", json=payload)

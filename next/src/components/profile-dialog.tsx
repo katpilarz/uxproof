@@ -28,7 +28,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button }     from '@/components/ui/button';
 import { Input }      from '@/components/ui/input';
 import { Label }      from '@/components/ui/label';
@@ -46,13 +45,6 @@ import {
 
 const MAX_AVATAR_BYTES   = 4 * 1024 * 1024; // keep in sync with lib/avatar.ts
 const MIN_PASSWORD_CHARS = 8;               // keep in sync with lib/auth.ts
-
-function initialsFor(email: string, name?: string): string {
-  const source = (name || email.split('@')[0] || '?').trim();
-  const parts  = source.split(/[\s._-]+/).filter(Boolean);
-  const chars  = parts.length >= 2 ? parts[0][0] + parts[1][0] : source.slice(0, 2);
-  return chars.toUpperCase();
-}
 
 function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
@@ -235,21 +227,23 @@ function ProfileForms({ user }: { user: AuthUser }) {
           <p className="text-sm font-medium">
             {avatar ? 'New photo selected' : shownAvatar ? 'Profile photo' : 'No profile photo'}
           </p>
+          <p className="text-xs text-muted-foreground">
+            Shown on your avatar and in the account menu.
+          </p>
           <div className="flex items-center gap-2">
             <Button
               type="button" variant="outline" size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="h-7 text-xs"
             >
-              {shownAvatar ? 'Change' : 'Upload'}
+              {shownAvatar ? 'Change photo' : 'Upload photo'}
             </Button>
             {shownAvatar && (
               <Button
-                type="button" variant="ghost" size="sm"
+                type="button" variant="outline" size="sm"
                 onClick={removePhoto}
-                className="h-7 gap-1 text-xs text-muted-foreground"
+                className="gap-1.5 text-muted-foreground hover:text-red-600 hover:border-red-300 dark:hover:text-red-400"
               >
-                <X className="size-3" />
+                <X className="size-3.5" />
                 Remove
               </Button>
             )}
@@ -285,18 +279,11 @@ function ProfileForms({ user }: { user: AuthUser }) {
         <p role="alert" className="text-sm text-destructive mt-3">{profileError}</p>
       )}
 
-      <div className="flex items-center gap-3 mt-4">
+      <div className="mt-4">
         <Button type="submit" size="sm" disabled={pending || !profileDirty}>
           {pending && <Loader2 className="size-3.5 animate-spin" />}
           Save profile
         </Button>
-        <Avatar className="size-7 ml-auto">
-          {shownAvatar && <AvatarImage src={shownAvatar} alt="" />}
-          <AvatarFallback className="text-[10px]">
-            {initialsFor(user.email, name || user.name)}
-          </AvatarFallback>
-        </Avatar>
-        <span className="text-xs text-muted-foreground">Preview</span>
       </div>
     </form>
 

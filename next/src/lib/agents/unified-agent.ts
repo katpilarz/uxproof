@@ -34,6 +34,7 @@
 
 import {
   resolveReportContext,
+  fetchUserPeriods,
   ReportContext,
   SanityReport,
   AggregatedMetrics,
@@ -79,15 +80,15 @@ function isCasualOrMeta(query: string): boolean {
 function buildCasualResponse(query: string): string {
   const q = query.toLowerCase().trim();
   if (/^(hi|hello|hey)\b/.test(q) || /^good (morning|afternoon|evening)/.test(q))
-    return `Hello! I'm the **uxproof research assistant**.\n\nI can help you with:\n\n• **Analyse a quarter** — _"Analyse Q3 2025"_ or _"What is the SUS score for Q4 2025?"_\n• **Compare periods** — _"Compare Q3 vs Q4 2025"_\n• **Full year overviews** — _"Full year 2025 overview"_\n• **Generate presentations** — _"Generate Q4 2025 presentation"_ or _"Generate 2025 presentation"_\n• **Deep AI analysis** — _"Deep analysis Q3 2025"_\n\nWhat would you like to explore?`;
+    return `Hello! I'm the **uxproof research assistant**.\n\nEverything I answer comes from the research files **you upload** — add one with the **+** button any time.\n\nI can help you with:\n\n• **See what you have** — _"Summarize my files"_\n• **Analyse a period** — _"Analyse my latest quarter"_ or name one, _"Analyse Q3 2026"_\n• **Compare periods** — _"Compare Q3 2026 vs Q4 2026"_\n• **Full year overviews** — _"Full year 2026 overview"_\n• **Generate presentations** — _"Generate a presentation"_ for your latest period\n\nWhat would you like to explore?`;
   if (/how (can|do) you help/.test(q) || /what can you do/.test(q) || /^help\b/.test(q))
-    return `I'm the **uxproof research assistant** — I turn UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Query SUS, task success, NPS, error-rate and conversion data from any quarter\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
-  if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Generate Q4 2025 presentation"_ or _"Analyse Q3 2025"_`;
-  if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse Q3 2025"_`;
+    return `I'm the **uxproof research assistant** — I turn **the research files you upload** into client-ready insights and presentations. I only ever work from your own data.\n\n**I can:**\n\n• Summarize the documents you've uploaded\n• Query SUS, task success, NPS, error-rate and conversion data from your periods\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• _"Summarize my files"_\n• _"Analyse my latest quarter"_\n• _"Generate a presentation"_`;
+  if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Summarize my files"_ or _"Generate a presentation"_`;
+  if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse my latest quarter"_`;
   if (/^(thanks|thank you)/.test(q)) return `You're welcome! Let me know if you need any other analysis or a presentation.`;
   if (/^(can you|are you able to|do you)\b/.test(q))
-    return `Yes — I can generate presentations for either scope:\n\n• **Single quarter** — _"Generate Q2 2025 presentation"_ → 8-slide deck focused on that quarter's research\n• **Full year** — _"Generate 2025 presentation"_ → 8-slide deck aggregating all quarters of that year\n\nI can also compare multiple periods side by side. What would you like?`;
-  return `I can help you analyse UX research data and generate presentations. Try: _"Analyse Q3 2025"_`;
+    return `Yes — I can generate presentations for either scope:\n\n• **Single quarter** — _"Generate Q2 2026 presentation"_ → 8-slide deck focused on that quarter's research\n• **Full year** — _"Generate 2026 presentation"_ → 8-slide deck aggregating every quarter you have for that year\n\nEvery deck is the same fixed 8 slides, built from your uploaded data. Say _"Generate a presentation"_ and I'll use your latest period. What would you like?`;
+  return `I can help you analyse the research you've uploaded and generate presentations. Try: _"Summarize my files"_`;
 }
 
 // ─── Intent + scope detection ────────────────────────────────────────────────
@@ -465,8 +466,28 @@ function buildResponse(
 
 // ─── Period-clarification response ───────────────────────────────────────────
 
-function buildPeriodClarification(topic: string): string {
-  return `Which period would you like the **${topic}** for?\n\nFor example:\n\n• _"Give me ${topic} for Q3 2025"_\n• _"Show me ${topic} for full year 2025"_\n• _"Compare ${topic} for Q2 vs Q3 2025"_`;
+/**
+ * Ask which period, offering the periods the user actually has. The
+ * examples used to be hardcoded 2025 quarters — periods from the demo
+ * seed that no user necessarily owns, so the "for example" was a list of
+ * queries that would fail.
+ */
+function buildPeriodClarification(
+  topic:   string,
+  periods: Array<{ quarter: string; year: number }>,
+): string {
+  if (!periods.length) {
+    return `Which period would you like the **${topic}** for?\n\nYou don't have any research data yet — upload a report with the **+** button and I'll have periods to work with.`;
+  }
+  const [latest, previous] = periods;
+  const examples = [`• _"Give me ${topic} for ${latest.quarter} ${latest.year}"_`];
+  if (previous) {
+    examples.push(`• _"Compare ${topic} for ${previous.quarter} ${previous.year} vs ${latest.quarter} ${latest.year}"_`);
+  }
+  examples.push(`• _"Show me ${topic} for full year ${latest.year}"_`);
+
+  const available = periods.map(p => `${p.quarter} ${p.year}`).join(', ');
+  return `Which period would you like the **${topic}** for?\n\nYou have data for **${available}**.\n\n${examples.join('\n')}`;
 }
 
 // ─── Year-scope hint injection ───────────────────────────────────────────────
@@ -509,10 +530,11 @@ async function processQuery(context: AIContext, query: string, userId: string): 
     return {
       id:        Date.now().toString(),
       role:      'assistant',
-      content:   buildPeriodClarification(clarif.topic),
+      content:   buildPeriodClarification(clarif.topic, await fetchUserPeriods(userId)),
       timestamp: new Date(),
       agentInfo: { agent: 'uxproof assistant', processingTime: '0.0s' },
       contextRef: undefined,
+      isMeta:     true,
     };
   }
 
@@ -566,6 +588,7 @@ async function processQuery(context: AIContext, query: string, userId: string): 
       timestamp: new Date(),
       agentInfo: { agent: 'uxproof assistant', processingTime: elapsed },
       contextRef: undefined,
+      isMeta:     true,
     };
   }
 

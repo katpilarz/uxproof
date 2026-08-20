@@ -53,17 +53,36 @@ interface PresentationPreviewProps {
 
 type GenState = 'idle' | 'generating' | 'ready' | 'downloading' | 'error';
 
-// Mirrors the 8-slide uxproof deck: strictly monochrome — white
-// foundation with black headline / trend / summary panels.
-const DECK_SLIDES = [
-  { n: 1, label: 'Cover',           bg: 'bg-white border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800', txt: 'text-zinc-400' },
-  { n: 2, label: 'Headline Score',  bg: 'bg-zinc-900',                                                           txt: 'text-white/80' },
-  { n: 3, label: 'Trend',           bg: 'bg-zinc-900',                                                           txt: 'text-white/70' },
-  { n: 4, label: 'UX Indicators',   bg: 'bg-white border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800', txt: 'text-zinc-400' },
-  { n: 5, label: 'Issues',          bg: 'bg-white border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800', txt: 'text-zinc-400' },
-  { n: 6, label: 'Recommendations', bg: 'bg-white border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800', txt: 'text-zinc-400' },
-  { n: 7, label: 'Summary',         bg: 'bg-zinc-900',                                                           txt: 'text-white/70' },
-  { n: 8, label: 'Thank You',       bg: 'bg-white border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800', txt: 'text-zinc-400' },
+// A representative strip of the Dossier template, not a promise of the
+// deck's contents: slide presence follows the data, so the real deck is
+// only known once it is built. Ground tiles for content slides, violet
+// for the cover plate and section dividers.
+const GROUND = 'bg-[#F3F2F2] border border-zinc-300 dark:border-zinc-600';
+const VIOLET = 'bg-[#6D4AF5]';
+
+interface SlideTile { n: number; label: string; bg: string; txt: string }
+
+/** What the API reports a built deck contains. */
+interface SlideSummary { kind: string; label: string; tone: 'violet' | 'ground' }
+
+const tile = (n: number, label: string, tone: 'violet' | 'ground'): SlideTile => ({
+  n, label,
+  bg:  tone === 'violet' ? VIOLET : GROUND,
+  txt: tone === 'violet' ? 'text-white/80' : 'text-zinc-500',
+});
+
+// Shown BEFORE generating, when the deck does not exist yet: a
+// representative strip, not a promise. Once the deck is built the API
+// reports what it actually contains and that replaces this.
+const TEMPLATE_STRIP: SlideTile[] = [
+  tile(1, 'Cover',             'violet'),
+  tile(2, 'Contents',          'ground'),
+  tile(3, 'Executive summary', 'ground'),
+  tile(4, 'Study at a glance', 'ground'),
+  tile(5, 'Section',           'violet'),
+  tile(6, 'Finding',           'ground'),
+  tile(7, 'Findings summary',  'violet'),
+  tile(8, 'Recommendations',   'ground'),
 ];
 
 function parseQuarterPeriod(period: string): { quarter: string; year: number } | null {
@@ -100,7 +119,9 @@ export function PresentationPreview({
   const [genState, setGenState] = useState<GenState>(initialUrl ? 'ready' : 'idle');
   const [url,      setUrl]      = useState(initialUrl ?? '');
   const [error,    setError]    = useState('');
-  const [count,    setCount]    = useState(slideCount ?? 8);
+  const [count,    setCount]    = useState(slideCount ?? 0);
+  /** The deck the API actually built; empty until it has been generated. */
+  const [built,    setBuilt]    = useState<SlideTile[]>([]);
   const [elapsed,  setElapsed]  = useState(0);
   const autoFired = useRef(false);
 
@@ -184,7 +205,9 @@ export function PresentationPreview({
       } else {
         const data = await res.json();
         setUrl(data.downloadUrl);
-        setCount(data.slidesCount ?? 8);
+        setCount(data.slidesCount ?? 0);
+        const summary: SlideSummary[] = Array.isArray(data.slides) ? data.slides : [];
+        setBuilt(summary.map((sl, i) => tile(i + 1, sl.label, sl.tone)));
       }
       // Let the pipeline steps finish playing before revealing the deck.
       const remaining = MIN_GENERATING_MS - (Date.now() - startedAt);
@@ -251,7 +274,7 @@ export function PresentationPreview({
 
   const SlideGrid = () => (
     <div className="grid grid-cols-4 gap-1.5 my-3">
-      {DECK_SLIDES.map(slide => (
+      {(built.length ? built : TEMPLATE_STRIP).map(slide => (
         <div
           key={slide.n}
           className={`relative aspect-[16/9] rounded overflow-hidden ${slide.bg}`}
@@ -281,7 +304,7 @@ export function PresentationPreview({
           </div>
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-sm truncate text-foreground">{period}</h4>
-            <p className="text-xs text-muted-foreground">{count} slides · research template</p>
+            <p className="text-xs text-muted-foreground">{count} slides · Dossier template</p>
           </div>
           <Badge variant="secondary" className="gap-1 shrink-0">
             <Check className="size-3 text-emerald-500" />
@@ -364,7 +387,9 @@ export function PresentationPreview({
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm truncate text-foreground">{period}</h4>
-          <p className="text-xs text-muted-foreground">8 slides · Research template</p>
+          <p className="text-xs text-muted-foreground">
+            Dossier template · slides follow your data
+          </p>
         </div>
       </div>
 

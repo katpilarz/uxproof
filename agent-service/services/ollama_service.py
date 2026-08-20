@@ -29,6 +29,11 @@ async def chat_completion(
         "messages":    messages,
         "temperature": temperature,
         "max_tokens":  max_tokens,
+        # Reasoning models (qwen3.5 and friends) spend the token budget on a
+        # chain-of-thought and return an empty `content`, which would make
+        # every LLM step here fail validation and fall back to deterministic
+        # output. Ollama ignores this on non-reasoning models.
+        "reasoning_effort": "none",
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
@@ -50,6 +55,11 @@ async def chat_completion_stream(
         "temperature": temperature,
         "max_tokens":  max_tokens,
         "stream":      True,
+        # Reasoning models (qwen3.5 and friends) spend the token budget on a
+        # chain-of-thought and return an empty `content`, which would make
+        # every LLM step here fail validation and fall back to deterministic
+        # output. Ollama ignores this on non-reasoning models.
+        "reasoning_effort": "none",
     }
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         async with client.stream("POST", _COMPLETIONS, json=payload) as r:

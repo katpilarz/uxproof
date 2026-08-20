@@ -43,6 +43,14 @@ interface AssistantMessageMeta {
   year?:              number;
   /** Quarter picked up from the user query — forwarded when scope='quarter' */
   quarter?:           string;
+  /**
+   * This reply is the assistant talking about itself — a "which period did
+   * you mean?" clarification, a "you have no data yet" prompt — rather than
+   * a rendering of research data. It is already written for a human, so the
+   * conversational rewrite must leave it alone: passing one through the
+   * model paraphrases the worked examples out of it.
+   */
+  isMeta?:            boolean;
 }
 
 // ─── AI response (returned from /api/chat to the client) ─────────────────────

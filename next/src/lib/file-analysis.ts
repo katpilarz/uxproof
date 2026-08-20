@@ -5,9 +5,16 @@
 //
 // Grounding rules: the AI summary may only restate facts from the document
 // (numeric guardrail — every substantial number must literally appear in
-// the source text, else the summary is discarded), and when the text
-// carries [page N] markers (PDF extraction) it cites the page each fact
-// comes from, so users can verify nothing is hallucinated.
+// the source text, else the summary is discarded).
+//
+// Citations are not taken on trust. The model attaches a verbatim quote to
+// each fact; lib/source-index.ts looks that quote up in the document and
+// writes the citation from where it was actually found (p. 2 ¶3). A quote
+// the document does not contain loses its citation instead of gaining a
+// fabricated one, so every "(p. N ¶M)" a user sees points at real text
+// they can go and read.
+
+import { applyVerifiedCitations } from './source-index';
 
 const OLLAMA_URL   = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL    || 'qwen2.5:14b';
@@ -51,13 +58,18 @@ export function summaryNumbersGrounded(reply: string, text: string): boolean {
  * timeout, guardrail) — callers fall back to fallbackTextSummary.
  */
 export async function aiDocumentSummary(filename: string, text: string): Promise<string | null> {
-  const hasPageMarkers = /\[page \d+\]/i.test(text);
   try {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model:   OLLAMA_MODEL,
+        // qwen3.5 and other reasoning models emit a chain-of-thought that
+        // consumes the token budget and leaves `content` empty — every
+        // grounded answer here would silently fall back to the template.
+        // Ollama ignores this on non-reasoning models, so it is safe to
+        // send unconditionally.
+        think:   false,
         stream:  false,
         options: { temperature: 0.2, num_predict: 600 },
         messages: [
@@ -70,15 +82,18 @@ export async function aiDocumentSummary(filename: string, text: string): Promise
               '2. **Metrics** — every key metric in the document with its exact value (SUS, task success, NPS, trust, participants, error rate, targets…), as a bullet list.\n' +
               '3. **Key issues / findings** — each with its supporting numbers where the document gives them.\n' +
               '4. **Recommendations** — the document\'s own recommendations.\n' +
-              'Use ONLY facts and numbers that literally appear in the document — never invent, estimate, or round numbers. Omit a section only if the document has nothing for it. No greetings.' +
-              (hasPageMarkers
-                ? '\nThe document text contains [page N] source markers. After EVERY metric, finding, and recommendation, cite the page it appears on in parentheses, e.g. "(p. 2)". Use only the page whose marked section actually contains that fact.'
-                : ''),
+              'Use ONLY facts and numbers that literally appear in the document — never invent, estimate, or round numbers. Omit a section only if the document has nothing for it. No greetings.\n' +
+              'CITATIONS: after EVERY metric, finding and recommendation, add the sentence or phrase from the document that supports it, copied WORD FOR WORD, wrapped as ⟦q: copied words⟧. ' +
+              'Copy exactly — do not paraphrase, shorten or fix the wording inside the marker; it is checked against the document and dropped if it does not match. ' +
+              'Keep each quote between 6 and 20 words. Do not write page numbers yourself — they are filled in automatically from the quote.',
           },
           { role: 'user', content: `Document "${filename}":\n\n${text.slice(0, 8000)}` },
         ],
       }),
-      signal: AbortSignal.timeout(30_000),
+      // Larger models are slower: a 27B model takes ~26s on an 8-page PDF,
+      // which used to trip the old 30s budget and silently drop every AI
+      // summary to the deterministic fallback.
+      signal: AbortSignal.timeout(90_000),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -94,7 +109,20 @@ export async function aiDocumentSummary(filename: string, text: string): Promise
     // source text. Page citations pass because their [page N] markers are
     // part of the text being checked against.
     if (!summaryNumbersGrounded(reply, text)) return null;
-    return reply;
+
+    // Turn each quote marker into a citation pointing at where that quote
+    // actually lives. Quotes the document doesn't contain lose their
+    // citation rather than getting a made-up one.
+    const cited = applyVerifiedCitations(reply, text);
+
+    // The model was asked for quotes and produced none that check out —
+    // it is not reading the document, so the summary is not trustworthy
+    // enough to show. Fall back to the deterministic one.
+    if (cited.claimed > 0 && cited.verified === 0) {
+      console.warn('[file-analysis] no citation verified out of', cited.claimed, '— discarding summary');
+      return null;
+    }
+    return cited.text;
   } catch {
     return null;
   }

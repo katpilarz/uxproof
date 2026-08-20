@@ -40,10 +40,21 @@ import {
   parseCsvReports,
   numberAppearsIn,
   salvageScalarFields,
+  groundTasks,
+  groundParticipantScores,
+  groundQuotes,
+  type ParsedTask,
+  type ParsedParticipantScore,
+  type ParsedQuote,
 } from '@/lib/report-parsing';
 
 const MAX_FILE_BYTES  = 5 * 1024 * 1024;
 const MAX_STORED_TEXT = 30_000;
+/**
+ * How much of a document the model sees. 8000 cut the last page off an
+ * eight-page report — which is exactly where per-participant scores live.
+ */
+const MAX_MODEL_CHARS = 14_000;
 
 const OLLAMA_URL   = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL    || 'qwen2.5:14b';
@@ -90,6 +101,68 @@ function currentPeriod(): { quarter: string; year: number } {
   return { quarter: `Q${Math.floor(now.getMonth() / 3) + 1}`, year: now.getFullYear() };
 }
 
+/**
+ * Per-task results, per-participant SUS and verbatim quotes — the evidence
+ * the deck's richest slides are built from.
+ *
+ * A SECOND, focused call rather than more fields on the main one: asked for
+ * everything at once the model returns the scalars and quietly omits the
+ * arrays; asked only for these it returns all of them. Splitting also means
+ * a failure here costs only the detail, because the report itself is
+ * already extracted and safe.
+ *
+ * Every value is validated against the document before it is kept.
+ */
+async function extractDetailViaModel(text: string): Promise<{
+  tasks:             ParsedTask[];
+  participantScores: ParsedParticipantScore[];
+  quotes:            ParsedQuote[];
+} | null> {
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model:   OLLAMA_MODEL,
+        think:   false,
+        stream:  false,
+        format:  'json',
+        options: { temperature: 0, num_predict: 3600 },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You extract detailed UX research data from documents. Respond with ONE JSON object:\n' +
+              '{"tasks": [{"code" ("T1".."T9"), "name", "successRate" number, "medianTime" ("m:ss"), "errors" number}] or [], ' +
+              '"participantScores": [{"participant" ("P01".."P99"), "score" number 0-100}] or [], ' +
+              '"quotes": [{"text", "attribution"}] or []}\n' +
+              'STRICT RULES: copy ONLY what the document lists — never estimate, complete a series, or invent a row. ' +
+              'Return [] for anything the document does not contain. ' +
+              'A quote must be the participant\u2019s words copied character for character; never paraphrase or compose one.',
+          },
+          { role: 'user', content: `Document:\n\n${text.slice(0, MAX_MODEL_CHARS)}` },
+        ],
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const raw  = JSON.parse(data?.message?.content ?? 'null');
+    if (!raw || typeof raw !== 'object') return null;
+
+    // The raw document: each guard strips commas itself where a numeric
+    // comparison needs it, and quotes must be matched against real prose.
+    return {
+      tasks:             groundTasks(raw.tasks, text),
+      participantScores: groundParticipantScores(raw.participantScores, text),
+      quotes:            groundQuotes(raw.quotes, text),
+    };
+  } catch (e) {
+    console.warn('[api/files] detail extraction unavailable:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 async function extractReportViaModel(filename: string, text: string): Promise<ParsedReport | null> {
   try {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
@@ -97,9 +170,19 @@ async function extractReportViaModel(filename: string, text: string): Promise<Pa
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model:   OLLAMA_MODEL,
+        // qwen3.5 and other reasoning models emit a chain-of-thought that
+        // consumes the token budget and leaves `content` empty — every
+        // grounded answer here would silently fall back to the template.
+        // Ollama ignores this on non-reasoning models, so it is safe to
+        // send unconditionally.
+        think:   false,
         stream:  false,
         format:  'json',
-        options: { temperature: 0, num_predict: 1200 },
+        // 1200 was tight enough that the prompt had to demand "under 20 words"
+        // per field to fit, which truncated the issues and recommendations
+        // extracted from real reports. The cap is a safety limit against a
+        // runaway reply, not a style budget.
+        options: { temperature: 0, num_predict: 2400 },
         messages: [
           {
             role: 'system',
@@ -113,10 +196,11 @@ async function extractReportViaModel(filename: string, text: string): Promise<Pa
               '"insights": [{"category", "title", "summary"}] or []}\n' +
               'STRICT RULES: use ONLY values that literally appear in the document — never estimate, convert, or invent a number. ' +
               'A metric not present in the document is null. quarter/year only if the document names them. ' +
-              'At most 3 issues and 3 insights, each grounded in the document. BE TERSE: every ' +
-              'description, recommendation and summary must stay under 20 words — the reply must fit the token budget.',
+              'At most 3 issues and 3 insights, each grounded in the document. Keep each ' +
+              'description, recommendation and summary to one or two clear sentences — enough to ' +
+              'be useful to someone who has not read the document, without restating it.',
           },
-          { role: 'user', content: `Document "${filename}":\n\n${text.slice(0, 8000)}` },
+          { role: 'user', content: `Document "${filename}":\n\n${text.slice(0, MAX_MODEL_CHARS)}` },
         ],
       }),
       signal: AbortSignal.timeout(120_000),
@@ -154,6 +238,7 @@ async function extractReportViaModel(filename: string, text: string): Promise<Pa
       if (raw[field] == null) delete raw[field];
     }
     if (raw.susScore == null) return null;
+
 
     // Period is a filing label — fall back to the current quarter when the
     // document doesn't name one.
@@ -285,8 +370,30 @@ export async function POST(request: NextRequest) {
         extractedByModel = true;
       }
     }
+    // Detail extraction runs once for the document and attaches to the
+    // period it describes. Only for prose uploads: a CSV of quarterly
+    // metrics has no tasks, participants or quotes to find, so calling the
+    // model for it would cost a minute to learn nothing.
+    const detail = extractedByModel && parsed.length === 1
+      ? await extractDetailViaModel(text)
+      : null;
+    if (detail) {
+      console.log(
+        '[api/files] detail extracted —',
+        `${detail.tasks.length} tasks,`,
+        `${detail.participantScores.length} participant scores,`,
+        `${detail.quotes.length} quotes`,
+      );
+    }
+
     for (const report of parsed) {
-      await upsertUserReport(user.id, report as unknown as { quarter: string; year: number } & Record<string, unknown>);
+      const withDetail = {
+        ...(report as unknown as Record<string, unknown>),
+        ...(detail?.tasks.length             ? { tasks:             detail.tasks }             : {}),
+        ...(detail?.participantScores.length ? { participantScores: detail.participantScores } : {}),
+        ...(detail?.quotes.length            ? { quotes:            detail.quotes }            : {}),
+      };
+      await upsertUserReport(user.id, withDetail as { quarter: string; year: number } & Record<string, unknown>);
     }
     const reportsCreated = parsed.map(r => `${r.quarter} ${r.year}`);
 

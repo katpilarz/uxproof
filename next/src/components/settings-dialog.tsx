@@ -1,6 +1,7 @@
 'use client';
 
-import { Cpu, FileText } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Cpu, FileText, Image as ImageIcon, Loader2, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -12,6 +13,8 @@ import {
   SelectValue,
 } from './ui/select';
 import { SettingsDialogProps } from '@/types';
+import { toGreyscaleJpeg } from '@/lib/greyscale';
+import { useShowToast } from '@/store';
 
 function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
@@ -23,6 +26,121 @@ function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: 
         {label}
       </span>
       <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
+/**
+ * The photograph used on the deck cover and section dividers. Converted to
+ * greyscale in the browser before upload — the Dossier template carries no
+ * colour tint, and doing it here means the stored image is already correct
+ * rather than relying on a later step.
+ */
+function DeckPhotoSection() {
+  const showToast = useShowToast();
+  const [url,     setUrl]     = useState<string | null>(null);
+  const [busy,    setBusy]    = useState(false);
+  const [error,   setError]   = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/deck-image', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : { url: null }))
+      .then(d => { if (!cancelled) setUrl(d.url ?? null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const choose = async (file: File | null) => {
+    if (!file) return;
+    setError('');
+    setBusy(true);
+    try {
+      const { file: grey } = await toGreyscaleJpeg(file);
+      const form = new FormData();
+      form.set('image', grey);
+      const res  = await fetch('/api/deck-image', { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed.');
+      setUrl(data.url ?? null);
+      showToast('Deck photograph updated', { variant: 'success' });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not use that image.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revert = async () => {
+    setBusy(true);
+    try {
+      await fetch('/api/deck-image', { method: 'DELETE' });
+      setUrl(null);
+      showToast('Reverted to the bundled photograph', { variant: 'info' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <SectionHeader icon={ImageIcon} label="Deck photograph" />
+      <div className="flex items-start gap-4">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          aria-label={url ? 'Change deck photograph' : 'Upload deck photograph'}
+          className="relative w-28 h-16 shrink-0 overflow-hidden border border-border bg-muted/40 grid place-items-center hover:border-violet-400 transition-colors"
+        >
+          {url ? (
+            // Remote Sanity URL and local previews alike — plain <img> is
+            // intentional (next/image can't optimize either here).
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt="" className="size-full object-cover" />
+          ) : (
+            <ImageIcon className="size-5 text-muted-foreground" />
+          )}
+        </button>
+
+        <div className="min-w-0 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Used on the cover and every section divider. Converted to greyscale
+            automatically — the template never carries a colour tint.
+            {!url && ' Currently using the bundled photograph.'}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button" variant="outline" size="sm"
+              onClick={() => inputRef.current?.click()}
+              disabled={busy}
+            >
+              {busy && <Loader2 className="size-3.5 animate-spin" />}
+              {url ? 'Change photo' : 'Upload photo'}
+            </Button>
+            {url && (
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={revert}
+                disabled={busy}
+                className="gap-1.5 text-muted-foreground hover:text-red-600 hover:border-red-300 dark:hover:text-red-400"
+              >
+                <X className="size-3.5" />
+                Use default
+              </Button>
+            )}
+          </div>
+          {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+        </div>
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={e => choose(e.target.files?.[0] ?? null)}
+        />
+      </div>
     </div>
   );
 }
@@ -62,6 +180,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </Select>
               </div>
             </div>
+
+            {/* ── Deck photograph ── */}
+            <DeckPhotoSection />
 
             {/* ── AI Model ── */}
             <div>
