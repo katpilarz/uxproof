@@ -154,6 +154,18 @@ export async function fetchReportsByQuarters(quarters: Quarter[], year: number, 
   );
 }
 
+/**
+ * The user's most recent report — the answer to "which period did they mean?"
+ * when the query names none. Ordering is year first, then quarter, both
+ * descending, so Q3 2026 beats Q1 2026 and 2026 beats 2025.
+ */
+export async function fetchLatestReport(userId: string): Promise<SanityReport | null> {
+  return sanity.fetch(
+    `*[_type == "report" && user._ref == $userId] | order(year desc, quarter desc)[0] { ${REPORT_FRAGMENT} }`,
+    { userId }
+  );
+}
+
 export async function fetchAllReports(userId: string): Promise<SanityReport[]> {
   return sanity.fetch(
     `*[_type == "report" && user._ref == $userId] | order(year asc, quarter asc) { ${REPORT_FRAGMENT} }`,
@@ -274,7 +286,10 @@ type ParsedIntent =
   | { type: 'year-comparison'; yearA: number; yearB: number }
   | { type: 'half'; half: 1 | 2; year: number }
   | { type: 'multi-quarter'; quarters: Quarter[]; year: number }
-  | { type: 'all' };
+  | { type: 'all' }
+  /** No period named anywhere in the query — resolve against the user's
+   *  own data rather than guessing a date. */
+  | { type: 'latest' };
 
 function parseIntent(query: string): ParsedIntent {
   const lower = query.toLowerCase();
@@ -336,8 +351,11 @@ function parseIntent(query: string): ParsedIntent {
     if (hasYearScopeKeyword) {
       return { type: 'year', year: yr };
     }
-    // Year present but no scope keyword and no quarter → default to Q4 of that year
-    return { type: 'single', period: { quarter: 'Q4', year: yr } };
+    // Year present, no scope keyword, no quarter. Q4 was assumed here, which
+    // silently answers about a quarter the user may not have uploaded;
+    // 'year' covers whatever they do have for that year and the aggregation
+    // degrades gracefully to a single quarter.
+    return { type: 'year', year: yr };
   }
 
   // ── Last year / this year ─────────────────────────────────────────────────
@@ -349,8 +367,14 @@ function parseIntent(query: string): ParsedIntent {
   const single = resolveQuarter(query);
   if (single) return { type: 'single', period: single };
 
-  // ── Default: most recent seeded quarter ──────────────────────────────────
-  return { type: 'single', period: { quarter: 'Q1', year: 2026 } };
+  // ── Default: no period named ─────────────────────────────────────────────
+  // This used to return a hardcoded { Q1, 2026 } — the "most recent seeded
+  // quarter" from the demo-dataset era. Since every report is now created
+  // from a user's own upload, that constant was simply wrong for everyone:
+  // "generate a presentation" resolved to a period the user had never
+  // uploaded, and the honest no-data refusal downstream named a quarter
+  // that had appeared from nowhere. Defer to the user's actual data instead.
+  return { type: 'latest' };
 }
 
 // ─── Main resolver ────────────────────────────────────────────────────────────
@@ -467,6 +491,24 @@ export async function resolveReportContext(query: string, userId: string): Promi
         reports,
         aggregated: aggregateReports(reports),
         period:     'All Available Periods',
+      };
+    }
+
+    case 'latest': {
+      // The query named no period, so "the latest thing you uploaded" is the
+      // only defensible reading. Returning null here (no reports at all) is
+      // what puts the caller on the "upload something first" path.
+      const primary = await fetchLatestReport(userId);
+      if (!primary) return null;
+      const prev       = previousPeriod({ quarter: primary.quarter as Quarter, year: primary.year });
+      const comparison = await fetchReport(prev.quarter, prev.year, userId);
+      return {
+        mode: 'single',
+        primary,
+        comparison:       comparison ?? undefined,
+        delta:            comparison ? deltaSingle(primary, comparison) : undefined,
+        period:           `${primary.quarter} ${primary.year}`,
+        comparisonPeriod: comparison ? `${comparison.quarter} ${comparison.year}` : undefined,
       };
     }
   }

@@ -38,7 +38,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createUnifiedAI } from '@/lib/agents/unified-agent';
 import { AIContext } from '@/types';
 import { createChatSession, appendMessageToSession, countUserFiles, getUserFileByName } from '@/lib/sanity';
-import { countUserReports } from '@/lib/services/report-query';
+import { countUserReports, fetchLatestReport } from '@/lib/services/report-query';
 import { aiDocumentSummary, fallbackTextSummary } from '@/lib/file-analysis';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -242,7 +242,18 @@ function resolvePeriodFromHistory(message: string, history: HistoryTurn[]): stri
 
 // ─── Period extractor + scope detector ────────────────────────────────────────
 
-function extractPeriod(message: string): { quarter: string; year: number } {
+/**
+ * The period the message names, or null when it names none.
+ *
+ * Returning null matters: this used to fall back to a hardcoded
+ * { Q1, 2026 } — the most recent quarter of the old demo seed. Every
+ * report is now created from a user's own upload, so that constant was
+ * wrong for everybody: "generate a presentation" resolved to a period the
+ * user had never uploaded, and the deck route then refused it while naming
+ * a quarter that had come out of nowhere. Callers resolve null against the
+ * user's actual data instead — see resolvePeriod().
+ */
+function extractPeriod(message: string): { quarter: string; year: number } | null {
   const lower = message.toLowerCase();
   const explicit = lower.match(/\b(q[1-4])\s*(\d{4})\b/);
   if (explicit) return { quarter: explicit[1].toUpperCase(), year: parseInt(explicit[2]) };
@@ -250,8 +261,58 @@ function extractPeriod(message: string): { quarter: string; year: number } {
   if (quarterOnly) return { quarter: quarterOnly[1].toUpperCase(), year: new Date().getFullYear() };
   const yearOnly = lower.match(/\b(20\d{2})\b/);
   if (yearOnly) return { quarter: 'Q4', year: parseInt(yearOnly[1]) };
-  return { quarter: 'Q1', year: 2026 };
+  return null;
 }
+
+/**
+ * The period a message is about: what it names, else the newest period the
+ * user has actually uploaded. Falls back to the current calendar quarter
+ * only when they have no reports at all — in which case every downstream
+ * path is going to ask them to upload something anyway.
+ */
+async function resolvePeriod(
+  message: string,
+  userId:  string,
+): Promise<{ quarter: string; year: number }> {
+  const named = extractPeriod(message);
+  if (named) return named;
+
+  const latest = await fetchLatestReport(userId);
+  if (latest) return { quarter: latest.quarter, year: latest.year };
+
+  const now = new Date();
+  return { quarter: `Q${Math.floor(now.getMonth() / 3) + 1}`, year: now.getFullYear() };
+}
+
+/**
+ * Is this asking for a deck of some size other than the one we make?
+ *
+ * The deliverable is a fixed 8-slide template (Cover → SUS headline →
+ * trend → indicators → issues → recommendations → summary → thank-you).
+ * "just one slide" is a reasonable thing to ask and a real answer exists —
+ * but the word "presentation" makes classifyMessage() route it into the
+ * data path, where it comes back as a confusing "no research data for that
+ * period" instead of "the deck is a fixed eight slides". Answer it directly.
+ */
+function asksForDifferentSlideCount(message: string): boolean {
+  const q = message.toLowerCase();
+  if (!/\b(slide|slides|deck|presentation|pptx|powerpoint)\b/.test(q)) return false;
+  if (/\b8\s*[-\s]?slides?\b|\beight\s+slides?\b/.test(q)) return false;   // that's what we make
+  return /\b(one|single|1)\s+slide\b/.test(q)
+      || /\bjust\s+(a|one)\s+slide\b/.test(q)
+      || /\b\d+\s*[-\s]?slides?\b/.test(q);
+}
+
+const FIXED_DECK_ANSWER =
+  `The deck is a **fixed 8-slide template**, so I can't produce a partial one — ` +
+  `every deck comes out with the same structure:\n\n` +
+  `1. Cover  2. SUS headline  3. Trend chart  4. UX indicators\n` +
+  `5. Top issues  6. Recommendations  7. Summary  8. Thank-you\n\n` +
+  `That consistency is the point — the decks go to clients, so they're all ` +
+  `laid out the same way.\n\n` +
+  `What I can do is generate the full deck and let you keep the one slide you ` +
+  `need: **_"Generate Q3 2026 presentation"_**. Once it's downloaded, delete ` +
+  `the slides you don't want in PowerPoint or Keynote.`;
 
 /**
  * Classify a presentation request as year-scope or quarter-scope.
@@ -321,7 +382,7 @@ function formatIntelligence(
 // ─── Agent-pipeline call (deep intent only) ───────────────────────────────────
 
 async function callAgentPipeline(message: string, userId: string) {
-  const { quarter, year } = extractPeriod(message);
+  const { quarter, year } = await resolvePeriod(message, userId);
 
   const t0  = Date.now();
   const res = await fetch(`${AGENT_SERVICE}/api/agents/run`, {
@@ -413,7 +474,36 @@ export async function POST(request: NextRequest) {
     const affirmedMessage     = resolveAffirmativeFollowUp(message, history);
     const resolvedMessage     = resolvePeriodFromHistory(affirmedMessage, history);
     const intent              = classifyMessage(resolvedMessage);
-    const { quarter, year }   = extractPeriod(resolvedMessage);
+
+    // Answer "just one slide" before any data lookup — it's a question about
+    // the deliverable, not about a period, and routing it at data makes it
+    // fail as a missing-period error.
+    if (asksForDifferentSlideCount(resolvedMessage)) {
+      if (sessionId) {
+        try {
+          await appendMessageToSession(sessionId, {
+            messageId: `msg_${Date.now()}_assistant`,
+            role:      'assistant',
+            content:   FIXED_DECK_ANSWER,
+          }, user.id);
+        } catch (e) {
+          console.warn('[chat/route] appendMessageToSession (deck shape) failed:', e);
+        }
+      }
+      return NextResponse.json({
+        id:               Date.now().toString(),
+        role:             'assistant',
+        content:          FIXED_DECK_ANSWER,
+        timestamp:        new Date(),
+        agentInfo:        { agent: 'uxproof assistant', processingTime: '0.0s' },
+        contextRef:       undefined,
+        showPresentation: false,
+        processingType:   'analysis',
+        isError:          false,
+      });
+    }
+
+    const { quarter, year }   = await resolvePeriod(resolvedMessage, user.id);
     const scope               = detectScope(resolvedMessage);
 
     console.log('[chat/route] intent:', intent, '| period:', quarter, year, '| scope:', scope);
@@ -640,7 +730,13 @@ export async function POST(request: NextRequest) {
         : `Failed to generate the requested content. ${errMsg}`,
       timestamp:        new Date(),
       agentInfo:        { agent: 'uxproof assistant', processingTime: '—' },
-      contextRef:       { project: 'UX Research Report', quarter: extractPeriod(message).quarter },
+      // Only claim a period the message actually named. The error path
+      // can't reach Sanity to resolve one (that may be what's broken), and
+      // labelling the failure with an invented quarter is the very thing
+      // the hardcoded default used to do.
+      contextRef:       extractPeriod(message)
+        ? { project: 'UX Research Report', quarter: extractPeriod(message)!.quarter }
+        : undefined,
       showPresentation: false,
       processingType:   'analysis',
       isError:          true,
