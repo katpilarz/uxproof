@@ -93,6 +93,68 @@ export default {
       ],
     },
 
+    // ── Detailed research data ──
+    //
+    // A UX report carries far more than seven scalars: per-task results,
+    // per-participant scores, what people actually said. These arrays are
+    // what let the Dossier deck render its Task Performance, SUS by
+    // Participant and evidence-carrying finding slides — each of those
+    // slides appears only when the array behind it has content.
+    //
+    // Everything here is EXTRACTED, never generated: the upload route
+    // validates each number against the source document and drops what it
+    // cannot find (lib/report-parsing.ts).
+    {
+      name: 'tasks',
+      title: 'Task Performance',
+      type: 'array',
+      description: 'Per-task results — drives the Task Performance slide.',
+      of: [
+        {
+          type: 'object',
+          fields: [
+            { name: 'code',        title: 'Task Code',      type: 'string' },  // "T1"
+            { name: 'name',        title: 'Task Name',      type: 'string' },
+            { name: 'successRate', title: 'Success Rate %', type: 'number' },
+            { name: 'medianTime',  title: 'Median Time',    type: 'string' },  // "3:31"
+            { name: 'errors',      title: 'Errors',         type: 'number' },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'participantScores',
+      title: 'SUS by Participant',
+      type: 'array',
+      description: 'Individual SUS scores — drives the SUS by Participant slide.',
+      of: [
+        {
+          type: 'object',
+          fields: [
+            { name: 'participant', title: 'Participant', type: 'string' },  // "P01"
+            { name: 'score',       title: 'SUS Score',   type: 'number' },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'quotes',
+      title: 'Participant Quotes',
+      type: 'array',
+      description:
+        'Verbatim quotes with attribution. Finding slides carry one as their ' +
+        'evidence; without them the slide has a title and nothing under it.',
+      of: [
+        {
+          type: 'object',
+          fields: [
+            { name: 'text',        title: 'Quote',       type: 'text' },
+            { name: 'attribution', title: 'Attribution', type: 'string' },  // "P04 · Engineering lead"
+          ],
+        },
+      ],
+    },
+
     // ── Research insights ──
     {
       name: 'insights',

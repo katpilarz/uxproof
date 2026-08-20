@@ -1,28 +1,22 @@
 /**
  * lib/ppt-generator.ts
  *
- * Renders the fixed 8-slide uxproof deck from a Sanity slidePlan:
+ * Renders the Dossier deck. Which slides exist is decided in
+ * lib/ppt/deck-data.ts; this file draws them.
  *
- *   1. Cover            — period + report title, full-colour cover photo right
- *   2. Headline Score   — hero SUS value on black, 4 KPI cards
- *   3. Usability Trend  — SUS / task-success line chart, black side panel
- *   4. UX Indicators    — 8 KPI cards on white
- *   5. Usability Issues — three numbered columns
- *   6. Recommendations  — three numbered columns under a black banner
- *   7. Summary          — editorial narrative on black
- *   8. Thank You        — centred display type, no logo
+ * Geometry comes straight from the build spec because the slide is
+ * defined at the size the spec is drawn for — 13.333 × 7.5 in — so every
+ * position here is the spec's own number, not a converted one.
  *
- * Styling is the original executive-report template geometry in strict
- * monochrome (lib/branding/brand.ts): black / white / gray only, no
- * logos, Space Grotesk + DM Sans + DM Mono throughout.
+ * Four masters carry everything (spec section 4):
+ *   M1 CONTENT   — eyebrow row, rule, title, standfirst, data field, credit
+ *   M2 COVER     — full-bleed photograph with a violet plate over it
+ *   M3 DIVIDER   — violet field, ghost numeral, title, photo panel right
+ *   M4 STATEMENT — M1's geometry on a violet field, one hero figure
  *
- * Layout notes preserved from earlier tuning:
- *   - Column titles on slides 5 + 6 render at a SINGLE fixed size (18pt);
- *     overflow is handled by word-boundary truncation at 44 chars, which
- *     matches the planning agent's MAX_COLUMN_TITLE_CHARS_HARD.
- *   - Slide 2 KPI value font 22pt; slide 4 KPI value font 20pt.
- *   - Hero kerning (-2) is reserved for the 88pt cover title and the
- *     64pt "Thank You" — everything else uses default kerning.
+ * House rules enforced at every call site: corner radius 0, no shadows, no
+ * gradients, flush-left text, and at most one violet figure per slide —
+ * violet marks the problem, so if everything is violet nothing is.
  */
 
 import PptxGenJS from 'pptxgenjs';
@@ -30,37 +24,42 @@ import fs from 'fs/promises';
 import { ASSETS, assertAssetsReady } from './ppt-assets';
 import { BRAND } from './branding/brand';
 import { downloadsDir } from './downloads';
+import {
+  harvestDeckData, buildDeck, describeDeck,
+  type DeckSlide, type Metric, type Finding, type Grounding, type SlideSummary,
+} from './ppt/deck-data';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const C = BRAND.colors;
+const F = BRAND.fonts;
+const T = BRAND.type;
+const G = BRAND.grid;
+const R = BRAND.rules;
 
-export type SlideType = 'title' | 'kpi' | 'trend' | 'issue' | 'insight' | 'summary';
 
-export type BlockType =
-  | 'subtitleBlock'
-  | 'kpiItem'
-  | 'chartBlock'
-  | 'issueItem'
-  | 'priorityItem';
+// ─── The slice of pptxgenjs this template uses ────────────────────────────────
+//
+// pptxgenjs ships loose types for its option bags, and the old generator
+// leaned on `any` throughout. Declaring the surface actually used keeps the
+// slide builders checked without pretending to model the whole library.
 
-export interface ContentBlock {
-  _type: BlockType;
-  _key?: string;
-  text?: string;
-  label?: string;
-  value?: string;
-  change?: number;
-  trend?: string;
-  chartData?: Array<{ name: string; labels: string[]; values: number[] }>;
-  title?: string;
-  description?: string;
-  severity?: string;
+type Opts = Record<string, unknown>;
+
+interface Slide {
+  background: { color: string };
+  addText(text: string, opts: Opts): void;
+  addShape(shape: unknown, opts: Opts): void;
+  addImage(opts: Opts): void;
 }
 
-export interface SlideConfig {
-  number:  number;
+interface Deck {
+  shapes: Record<string, unknown>;
+  addSlide(): Slide;
+  defineLayout(o: { name: string; width: number; height: number }): void;
+  layout:  string;
+  author:  string;
+  company: string;
   title:   string;
-  type:    SlideType;
-  content?: ContentBlock[];
+  writeFile(o: { fileName: string }): Promise<string>;
 }
 
 export interface PptResult {
@@ -70,593 +69,787 @@ export interface PptResult {
   generatedDate:  Date;
 }
 
-// ─── Palette & type (monochrome template system) ─────────────────────────────
-const C = {
-  black:    BRAND.colors.black,
-  white:    BRAND.colors.white,
-  grayDark: BRAND.colors.grayDark,
-  gray:     BRAND.colors.gray,
-  divider:  BRAND.colors.divider,
-};
+// ─── Primitives ───────────────────────────────────────────────────────────────
 
-const F = {
-  heading:      BRAND.fonts.display,       // Space Grotesk Medium
-  headingLight: BRAND.fonts.displayLight,  // Space Grotesk
-  body:         BRAND.fonts.body,          // DM Sans Medium
-  bodyDesc:     BRAND.fonts.bodyDesc,      // DM Sans 18pt Medium
-  mono:         BRAND.fonts.mono,          // DM Mono
-};
+/** A 1 pt structural rule, or a 0.5 pt hairline between list rows. */
+function rule(
+  s: Slide, pptx: Deck,
+  x: number, y: number, w: number,
+  weight: number = R.structural,
+  color:  string = C.ink40,
+) {
+  s.addShape(pptx.shapes.LINE, { x, y, w, h: 0, line: { color, width: weight } });
+}
 
-// Kerning. `hero` is the only size large enough that tight tracking reads
-// as a design choice rather than crowding — reserved for the 88pt cover
-// title and the 64pt "Thank You".
-const K = { hero: -2, heading: 0, body: 0 };
+/** A filled rectangle. Radius is always 0 — the template never rounds. */
+function block(s: Slide, pptx: Deck, o: { x: number; y: number; w: number; h: number; color: string }) {
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fill: { color: o.color }, line: { color: o.color, width: 0 },
+  });
+}
 
-// Chrome geometry — slide number top-right, report label bottom-left.
-const CH = {
-  numX:  9.550, numY:  0.100, numW:  0.349, numH:  0.199,
-  footerY:  5.427,
-  footerLX: 0.162, footerLW: 2.499,
-};
+/** Uppercase mono chrome — eyebrows, labels, slide numbers, the credit. */
+function chrome(s: Slide, o: {
+  text: string; x: number; y: number; w: number;
+  color?: string; align?: 'left' | 'right' | 'center'; semi?: boolean;
+}) {
+  s.addText(o.text.toUpperCase(), {
+    x: o.x, y: o.y, w: o.w, h: 0.2,
+    fontFace: o.semi === false ? F.mono : F.monoSemi,
+    fontSize: T.eyebrow.size,
+    charSpacing: T.eyebrow.spacing,
+    color: o.color ?? C.ink55,
+    align: o.align ?? 'left',
+    margin: 0, valign: 'middle',
+  });
+}
+
+const CREDIT = 'PAISAK4U — UX RESEARCH REPORT';
 
 /**
- * Single source of truth for the slide 5 + 6 column-title font size.
- * Titles render at this size REGARDLESS of length, for visual
- * consistency across the three columns. Length is controlled by the
- * planning agent (MAX_COLUMN_TITLE_CHARS_HARD = 44) and the truncation
- * step inside fitColumnTitle below.
+ * M1 CONTENT. Returns the slide with its chrome already drawn; callers
+ * fill the data field between G.fieldTop and G.fieldBottom.
  */
-const COLUMN_TITLE_SIZE      = 18;
-const COLUMN_TITLE_MAX_CHARS = 44;   // matches planning_agent.py hard cap
+function m1(pptx: Deck, o: { eyebrow: string; number: number; title?: string; standfirst?: string }) {
+  const s = pptx.addSlide();
+  s.background = { color: C.ground };
 
-// ─── Chrome ───────────────────────────────────────────────────────────────────
+  chrome(s, { text: o.eyebrow, x: G.marginX, y: G.eyebrowY - 0.1, w: 8, color: C.violet });
+  chrome(s, { text: String(o.number).padStart(2, '0'), x: G.marginX + G.contentW - 2, y: G.eyebrowY - 0.1, w: 2, align: 'right' });
+  rule(s, pptx, G.marginX, G.ruleY, G.contentW);
 
-function addChrome(s: any, num: number, dark: boolean, label: string) {
-  const numColor  = dark ? C.white : C.grayDark;
-  const footColor = dark ? C.white : C.gray;
+  if (o.title) {
+    s.addText(o.title, {
+      x: G.marginX, y: G.titleY, w: G.contentW, h: 0.62,
+      fontFace: F.displayXBold, fontSize: T.slideTitle.size,
+      charSpacing: T.slideTitle.spacing, lineSpacing: T.slideTitle.line,
+      color: C.ink, margin: 0, valign: 'top',
+    });
+  }
+  if (o.standfirst) {
+    s.addText(o.standfirst, {
+      x: G.marginX, y: G.standfirstY, w: G.contentW, h: 0.5,
+      fontFace: F.display, fontSize: T.standfirst.size,
+      lineSpacing: T.standfirst.size * 1.4, color: C.ink55, margin: 0, valign: 'top',
+    });
+  }
 
-  s.addText(String(num).padStart(2, '0'), {
-    x: CH.numX, y: CH.numY, w: CH.numW, h: CH.numH,
-    fontFace: F.mono, fontSize: 7.5, color: numColor, align: 'right', margin: 0,
+  chrome(s, { text: CREDIT, x: G.marginX, y: G.creditY, w: G.contentW, align: 'center', semi: false });
+  return s;
+}
+
+/** M4 VIOLET STATEMENT — M1's geometry with the field as background. */
+function m4(pptx: Deck, o: { eyebrow: string; number: number }) {
+  const s = pptx.addSlide();
+  s.background = { color: C.violet };
+
+  chrome(s, { text: o.eyebrow, x: G.marginX, y: G.eyebrowY - 0.1, w: 8, color: C.onVioletLabel });
+  chrome(s, {
+    text: String(o.number).padStart(2, '0'),
+    x: G.marginX + G.contentW - 2, y: G.eyebrowY - 0.1, w: 2,
+    align: 'right', color: C.onVioletLabel,
   });
-  s.addText(label, {
-    x: CH.footerLX, y: CH.footerY, w: CH.footerLW, h: 0.114,
-    fontFace: F.mono, fontSize: 7.5, color: footColor, margin: 0,
+  // Every rule on a violet slide is 1 pt — no hairlines (spec section 4).
+  rule(s, pptx, G.marginX, G.ruleY, G.contentW, R.structural, C.onVioletRule);
+  chrome(s, { text: CREDIT, x: G.marginX, y: G.creditY, w: G.contentW, align: 'center', color: C.onVioletLabel, semi: false });
+  return s;
+}
+
+// ─── Cover (M2) ───────────────────────────────────────────────────────────────
+
+function renderCover(pptx: Deck, slide: Extract<DeckSlide, { kind: 'cover' }>, photo: string) {
+  const s = pptx.addSlide();
+  s.background = { color: C.ink };
+
+  const { width: W, height: H } = BRAND.layout;
+  s.addImage({ data: photo, x: 0, y: 0, w: W, h: H, sizing: { type: 'cover', w: W, h: H } });
+
+  // Violet plate: 7.78 in wide, left edge on the margin, bottom edge
+  // 0.611 in above the slide bottom.
+  const plateW = 7.78;
+  const plateH = 4.6;
+  const plateY = H - G.bottomMargin - plateH;
+  block(s, pptx, { x: G.marginX, y: plateY, w: plateW, h: plateH, color: C.violet });
+
+  const padX = G.marginX + 0.5;    // 0.5 in side padding
+  const innerW = plateW - 1.0;
+  let y = plateY + 0.44;           // 0.44 in top padding
+
+  chrome(s, { text: `${slide.title} · ${slide.period}`, x: padX, y, w: innerW, color: C.onVioletLabel });
+  y += 0.42;
+
+  s.addText(BRAND.app, {
+    x: padX, y, w: innerW, h: 1.0,
+    fontFace: F.displayXBold, fontSize: T.coverName.size,
+    charSpacing: T.coverName.spacing, lineSpacing: T.coverName.line,
+    color: C.onVioletHeading, margin: 0, valign: 'top',
   });
+  y += 1.05;
+
+  s.addText(slide.title, {
+    x: padX, y, w: innerW, h: 0.42,
+    fontFace: F.displaySemi, fontSize: 24, color: C.onVioletHeading, margin: 0, valign: 'top',
+  });
+  y += 0.55;
+
+  s.addText(`Research findings and measures for ${slide.period}.`, {
+    x: padX, y, w: innerW, h: 0.34,
+    fontFace: F.display, fontSize: 14, color: C.onVioletStandfirst, margin: 0, valign: 'top',
+  });
+  y += 0.5;
+
+  rule(s, pptx, padX, y, innerW, R.structural, C.onVioletRule);
+  y += 0.22;
+
+  // Four-column meta block: label 12 pt mono at 70%, value 13 pt SemiBold.
+  const colW = innerW / Math.max(slide.meta.length, 1);
+  slide.meta.forEach((m, i) => {
+    const x = padX + i * colW;
+    chrome(s, { text: m.label, x, y, w: colW - 0.1, color: C.onVioletLabel });
+    s.addText(m.value, {
+      x, y: y + 0.24, w: colW - 0.1, h: 0.3,
+      fontFace: F.displaySemi, fontSize: 13, color: C.onVioletHeading, margin: 0, valign: 'top',
+    });
+  });
+
+  chrome(s, {
+    text: CREDIT, x: padX, y: plateY + plateH - 0.42, w: innerW,
+    align: 'center', color: C.onVioletLabel, semi: false,
+  });
+}
+
+// ─── Section divider (M3) ─────────────────────────────────────────────────────
+
+function renderDivider(pptx: Deck, slide: Extract<DeckSlide, { kind: 'divider' }>, num: number, photo: string) {
+  const s = pptx.addSlide();
+  s.background = { color: C.violet };
+
+  const { width: W, height: H } = BRAND.layout;
+  const panelW = 4.31;   // photograph panel flush to the right edge, full height
+  s.addImage({
+    data: photo,
+    x: W - panelW, y: 0, w: panelW, h: H,
+    sizing: { type: 'cover', w: panelW, h: H },
+  });
+
+  chrome(s, { text: `Section ${slide.numeral}`, x: G.marginX, y: G.eyebrowY - 0.1, w: 5, color: C.onVioletHeading });
+
+  s.addText(slide.numeral, {
+    x: G.marginX, y: 2.05, w: 5, h: 1.8,
+    fontFace: F.displayXBold, fontSize: T.ghostNumeral.size,
+    charSpacing: T.ghostNumeral.spacing, lineSpacing: T.ghostNumeral.line,
+    color: C.deepViolet, margin: 0, valign: 'middle',
+  });
+
+  s.addText(slide.title, {
+    x: G.marginX, y: 4.05, w: 5.5, h: 0.85,
+    fontFace: F.displayXBold, fontSize: T.dividerTitle.size,
+    charSpacing: T.dividerTitle.spacing, color: C.onVioletHeading, margin: 0, valign: 'top',
+  });
+
+  s.addText(slide.standfirst, {
+    x: G.marginX, y: 4.95, w: 4.6, h: 0.7,
+    fontFace: F.display, fontSize: T.pullQuote.size,
+    lineSpacing: T.pullQuote.size * 1.3, color: C.onVioletStandfirst, margin: 0, valign: 'top',
+  });
+
+  chrome(s, { text: String(num).padStart(2, '0'), x: G.marginX, y: H - G.bottomMargin - 0.2, w: 2, color: C.onVioletLabel });
+  chrome(s, { text: CREDIT, x: G.marginX, y: G.creditY, w: W - panelW - G.marginX * 2, align: 'center', color: C.onVioletLabel, semi: false });
+}
+
+// ─── Executive summary ────────────────────────────────────────────────────────
+
+const SEVERITY_LABEL: Record<string, string> = { high: 'Critical', medium: 'Major', low: 'Minor' };
+
+function renderExecSummary(pptx: Deck, slide: Extract<DeckSlide, { kind: 'exec-summary' }>, num: number) {
+  const s = m1(pptx, {
+    eyebrow: 'Overview', number: num, title: 'Executive Summary',
+    standfirst: `${slide.findings.length} issue${slide.findings.length === 1 ? '' : 's'} carry the friction observed this round.`,
+  });
+
+  const chipW = 1.04;
+  const rowH  = 0.62;
+  let y = G.fieldTop;
+
+  slide.findings.forEach(f => {
+    const sev = SEVERITY_LABEL[(f.severity ?? '').toLowerCase()] ?? 'Major';
+
+    severityChip(s, pptx, sev, G.marginX, y + 0.06);
+
+    s.addText(f.title, {
+      x: G.marginX + chipW + 0.22, y, w: G.contentW - chipW - 2.5, h: rowH - 0.1,
+      fontFace: F.display, fontSize: 16, color: C.ink, margin: 0, valign: 'middle',
+    });
+
+    if (f.description) {
+      // The spec's consequence column is 2.08 in and its examples are two
+      // or three words ("Trust collapses"). A sentence wraps to three
+      // lines and runs into the row below, so only the opening clause is
+      // shown, on one line, with wrapping off.
+      s.addText(consequenceOf(f.description), {
+        x: G.marginX + G.contentW - 2.08, y, w: 2.08, h: rowH - 0.1,
+        fontFace: F.display, fontSize: 13, color: C.ink55,
+        align: 'right', margin: 0, valign: 'middle', wrap: false,
+      });
+    }
+
+    rule(s, pptx, G.marginX, y + rowH, G.contentW, R.hairline, C.ink25);
+    y += rowH + 0.12;
+  });
+
+  if (slide.closing) {
+    s.addText(clamp(slide.closing, 200), {
+      x: G.marginX, y: G.fieldBottom - 0.7, w: G.contentW, h: 0.62,
+      fontFace: F.displaySemi, fontSize: 16, lineSpacing: 21,
+      color: C.deepViolet, margin: 0, valign: 'bottom',
+    });
+  }
+}
+
+// ─── Study at a glance ────────────────────────────────────────────────────────
+
+function renderGlance(pptx: Deck, slide: Extract<DeckSlide, { kind: 'glance' }>, num: number) {
+  const s = m1(pptx, { eyebrow: 'Overview', number: num, title: 'Study at a Glance' });
+
+  const gap   = 0.22;
+  const n     = slide.metrics.length;
+  const cardW = (G.contentW - gap * (n - 1)) / n;
+  const cardH = 2.9;
+
+  // Exactly one figure in violet — the weakest metric. Violet marks the
+  // problem; if everything is violet, nothing is.
+  const worst = indexOfWorst(slide.metrics);
+
+  slide.metrics.forEach((m, i) => {
+    const x = G.marginX + i * (cardW + gap);
+    s.addShape(pptx.shapes.RECTANGLE, {
+      x, y: G.fieldTop, w: cardW, h: cardH,
+      fill: { type: 'none' }, line: { color: C.ink40, width: R.structural },
+    });
+
+    // 75 pt is the spec's metric figure, but a long value ("83.0%") is
+    // wider than the card and wraps mid-number. Tidy it first, then step
+    // the size down rather than let a figure break across lines.
+    const value = tidyValue(m.value);
+    s.addText(value, {
+      x: x + 0.3, y: G.fieldTop + 0.28, w: cardW - 0.6, h: 1.05,
+      fontFace: F.displayXBold, fontSize: figureSize(value, cardW - 0.6),
+      charSpacing: T.metricFigure.spacing, lineSpacing: T.metricFigure.line,
+      color: i === worst ? C.violet : C.ink, margin: 0, valign: 'top', wrap: false,
+    });
+
+    s.addText(m.label, {
+      x: x + 0.3, y: G.fieldTop + cardH - 0.95, w: cardW - 0.6, h: 0.44,
+      fontFace: F.displaySemi, fontSize: 16, color: C.ink, margin: 0, valign: 'bottom',
+    });
+
+    // A change of zero is almost always "no previous value recorded", not
+    // "measured and identical" — printing "+0 vs previous" under every
+    // card makes a deck look like it has trend data when it has none.
+    if (m.change !== undefined && round2(m.change) !== 0) {
+      s.addText(`${m.change >= 0 ? '+' : ''}${round2(m.change)} vs previous`, {
+        x: x + 0.3, y: G.fieldTop + cardH - 0.5, w: cardW - 0.6, h: 0.3,
+        fontFace: F.display, fontSize: T.caption.size, color: C.ink55, margin: 0, valign: 'top',
+      });
+    }
+  });
+}
+
+// ─── Finding ──────────────────────────────────────────────────────────────────
+
+function renderFinding(pptx: Deck, slide: Extract<DeckSlide, { kind: 'finding' }>, num: number) {
+  const f = slide.finding;
+  // Finding slides run title-first — no standfirst (spec, slide 07).
+  const s = m1(pptx, { eyebrow: '01 · Findings', number: num, title: clamp(f.title, 52) });
+
+  let y = G.fieldTop;
+
+  // The participant's own words, when the report recorded them. Curly
+  // quotes, no italics, no quotation-mark graphic (spec, slide 07).
+  if (slide.quote) {
+    s.addText(`\u201c${slide.quote.text}\u201d`, {
+      x: G.marginX, y, w: G.contentW - 1.5, h: 1.0,
+      fontFace: F.display, fontSize: T.pullQuote.size,
+      lineSpacing: T.pullQuote.size * 1.3, color: C.ink, margin: 0, valign: 'top',
+    });
+    y += 1.1;
+    if (slide.quote.attribution) {
+      chrome(s, { text: slide.quote.attribution, x: G.marginX, y, w: 6 });
+      y += 0.42;
+    }
+  }
+
+  if (f.description) {
+    s.addText(f.description, {
+      x: G.marginX, y, w: G.contentW - 2.0, h: 1.4,
+      fontFace: F.display, fontSize: 16, lineSpacing: 22, color: C.ink55, margin: 0, valign: 'top',
+    });
+  }
+
+  const sev = SEVERITY_LABEL[(f.severity ?? '').toLowerCase()];
+  if (sev) {
+    // Severity is a word, so it gets the chip treatment from the executive
+    // summary rather than a 52 pt figure slot — that slot is for numbers,
+    // and a word set at hero size overflows it and reads as a headline.
+    rule(s, pptx, G.marginX, G.fieldBottom - 0.85, G.contentW);
+    severityChip(s, pptx, sev, G.marginX, G.fieldBottom - 0.62);
+    s.addText('severity assigned this round', {
+      x: G.marginX + 1.3, y: G.fieldBottom - 0.62, w: 5, h: 0.26,
+      fontFace: F.display, fontSize: 14, color: C.ink55, margin: 0, valign: 'middle',
+    });
+  }
+}
+
+// ─── Findings summary (M4) ────────────────────────────────────────────────────
+
+function renderFindingsSummary(pptx: Deck, slide: Extract<DeckSlide, { kind: 'findings-summary' }>, num: number) {
+  const s = m4(pptx, { eyebrow: '01 · Findings', number: num });
+
+  s.addText(slide.headline, {
+    x: G.marginX, y: 1.9, w: 5.4, h: 1.9,
+    fontFace: F.displayXBold, fontSize: T.heroFigure.size, charSpacing: T.heroFigure.spacing,
+    color: C.onVioletHeading, margin: 0, valign: 'middle',
+  });
+  s.addText(slide.gloss, {
+    x: G.marginX, y: 3.95, w: 5.0, h: 0.8,
+    fontFace: F.displaySemi, fontSize: T.pullQuote.size, lineSpacing: 25,
+    color: C.onVioletHeading, margin: 0, valign: 'top',
+  });
+
+  const listX = 7.0;
+  const listW = BRAND.layout.width - listX - G.marginX;
+  let y = 1.95;
+  slide.findings.forEach((f, i) => {
+    rule(s, pptx, listX, y, listW, R.structural, C.onVioletRule);
+    chrome(s, { text: `F${i + 1}`, x: listX, y: y + 0.14, w: 0.53, color: C.onVioletLabel });
+    s.addText(clamp(f.title, 56), {
+      x: listX + 0.53, y: y + 0.1, w: listW - 0.53, h: 0.5,
+      fontFace: F.displaySemi, fontSize: T.rowTitle.size, charSpacing: T.rowTitle.spacing,
+      color: C.onVioletHeading, margin: 0, valign: 'middle',
+    });
+    y += 0.72;
+  });
+  rule(s, pptx, listX, y, listW, R.structural, C.onVioletRule);
+}
+
+// ─── Trend (drawn with rectangles, never a chart object) ─────────────────────
+
+function renderTrend(pptx: Deck, slide: Extract<DeckSlide, { kind: 'trend' }>, num: number) {
+  const series = slide.trend.series[0];
+  const s = m1(pptx, {
+    eyebrow: '02 · Measures', number: num, title: series.name || 'Trend',
+    standfirst: 'Period over period, drawn from your uploaded reports.',
+  });
+
+  const values = series.values;
+  const labels = slide.trend.labels;
+  const plotH  = 2.78;
+  const baseY  = G.fieldTop + plotH + 0.4;
+  const gap    = 0.33;
+  const barW   = (G.contentW - gap * (values.length - 1)) / values.length;
+  const max    = Math.max(...values, 1);
+
+  values.forEach((v, i) => {
+    const h = Math.max((v / max) * (plotH - 0.5), 0.05);
+    const x = G.marginX + i * (barW + gap);
+    const y = baseY - h;
+    // The final period is the one being reported on — the only violet bar.
+    block(s, pptx, { x, y, w: barW, h, color: i === values.length - 1 ? C.violet : C.ink });
+
+    s.addText(String(round2(v)), {
+      x, y: y - 0.42, w: barW, h: 0.36,
+      fontFace: F.displayXBold, fontSize: T.rowTitle.size, charSpacing: T.rowTitle.spacing,
+      color: i === values.length - 1 ? C.deepViolet : C.ink, align: 'center', margin: 0, valign: 'bottom',
+    });
+    if (labels[i]) {
+      s.addText(labels[i], {
+        x, y: baseY + 0.1, w: barW, h: 0.3,
+        fontFace: F.displaySemi, fontSize: 14, color: C.ink, align: 'center', margin: 0, valign: 'top',
+      });
+    }
+  });
+
+  rule(s, pptx, G.marginX, baseY, G.contentW);
+}
+
+// ─── Task performance (spec slide 14) ────────────────────────────────────────
+
+const TASK_TARGET = 90;   // the template's target line
+
+function renderTaskPerformance(
+  pptx: Deck,
+  slide: Extract<DeckSlide, { kind: 'task-performance' }>,
+  num: number,
+) {
+  const s = m1(pptx, {
+    eyebrow: '02 · Measures', number: num, title: 'Task Performance',
+    standfirst: 'Success means completed without moderator help.',
+  });
+
+  const withRate = slide.tasks.filter(t => typeof t.successRate === 'number');
+  const tasks = withRate.length ? withRate : slide.tasks;
+
+  const plotH = 2.78;
+  const baseY = G.fieldTop + plotH;
+  const gap   = 0.33;
+  const barW  = (G.contentW - gap * (tasks.length - 1)) / tasks.length;
+
+  tasks.forEach((t, i) => {
+    const x    = G.marginX + i * (barW + gap);
+    const rate = t.successRate ?? 0;
+    const h    = Math.max((rate / 100) * (plotH - 0.5), 0.04);
+    const y    = baseY - h;
+    // Ink at or above target, violet below — violet marks the problem.
+    const below = rate < TASK_TARGET;
+    block(s, pptx, { x, y, w: barW, h, color: below ? C.violet : C.ink });
+
+    s.addText(`${round2(rate)}%`, {
+      x, y: y - 0.4, w: barW, h: 0.34,
+      fontFace: F.displayXBold, fontSize: T.rowTitle.size, charSpacing: T.rowTitle.spacing,
+      color: below ? C.deepViolet : C.ink, align: 'center', margin: 0, valign: 'bottom',
+    });
+
+    // Axis block: code, name, then "time · errors".
+    s.addText(t.code, {
+      x, y: baseY + 0.12, w: barW, h: 0.26,
+      fontFace: F.displaySemi, fontSize: 14, color: C.ink, align: 'center', margin: 0, valign: 'top',
+    });
+    if (t.name) {
+      s.addText(clamp(t.name, 26), {
+        x, y: baseY + 0.4, w: barW, h: 0.26,
+        fontFace: F.display, fontSize: 13, color: C.ink55, align: 'center', margin: 0, valign: 'top',
+      });
+    }
+    const meta = [t.medianTime, t.errors !== undefined ? `${t.errors} errors` : '']
+      .filter(Boolean).join(' · ');
+    if (meta) {
+      s.addText(meta, {
+        x, y: baseY + 0.66, w: barW, h: 0.26,
+        fontFace: F.display, fontSize: 13, color: C.ink55, align: 'center', margin: 0, valign: 'top',
+      });
+    }
+  });
+
+  rule(s, pptx, G.marginX, baseY, G.contentW);
+  // Target line across the full plot width.
+  const targetY = baseY - (TASK_TARGET / 100) * (plotH - 0.5);
+  rule(s, pptx, G.marginX, targetY, G.contentW, R.structural, C.violet);
+  chrome(s, {
+    text: `Target ${TASK_TARGET}%`,
+    x: G.marginX + G.contentW - 2.4, y: targetY - 0.24, w: 2.4, align: 'right', color: C.violet,
+  });
+}
+
+// ─── SUS by participant (spec slide 17) ──────────────────────────────────────
+
+function renderSusParticipants(
+  pptx: Deck,
+  slide: Extract<DeckSlide, { kind: 'sus-participants' }>,
+  num: number,
+) {
+  const below = slide.scores.filter(p => p.score < slide.benchmark).length;
+  const s = m1(pptx, {
+    eyebrow: '02 · Measures', number: num, title: 'SUS by Participant',
+    standfirst: `${below} of ${slide.scores.length} scored below the published average; the spread matters more than the mean.`,
+  });
+
+  // Inset the plot so the benchmark chip has room on the right.
+  const chipW  = 2.72;
+  const plotW  = G.contentW - chipW;
+  const plotH  = 2.78;
+  const baseY  = G.fieldTop + plotH;
+  const gap    = 0.14;
+  const n      = slide.scores.length;
+  const barW   = (plotW - gap * (n - 1)) / n;
+
+  slide.scores.forEach((p, i) => {
+    const x = G.marginX + i * (barW + gap);
+    const h = Math.max((p.score / 100) * (plotH - 0.5), 0.04);
+    const y = baseY - h;
+    const under = p.score < slide.benchmark;
+    block(s, pptx, { x, y, w: barW, h, color: under ? C.violet : C.ink });
+
+    s.addText(String(round2(p.score)), {
+      x, y: y - 0.32, w: barW, h: 0.28,
+      fontFace: F.displaySemi, fontSize: 13, color: under ? C.deepViolet : C.ink,
+      align: 'center', margin: 0, valign: 'bottom',
+    });
+    chrome(s, { text: p.participant, x, y: baseY + 0.12, w: barW, align: 'center' });
+  });
+
+  rule(s, pptx, G.marginX, baseY, plotW);
+
+  // Benchmark line at the published average, with its chip on the right.
+  const benchY = baseY - (slide.benchmark / 100) * (plotH - 0.5);
+  rule(s, pptx, G.marginX, benchY, plotW, R.benchmark, C.violet);
+  block(s, pptx, { x: G.marginX + plotW + 0.12, y: benchY - 0.22, w: chipW - 0.12, h: 0.44, color: C.violet });
+  s.addText(String(slide.benchmark), {
+    x: G.marginX + plotW + 0.24, y: benchY - 0.22, w: 0.7, h: 0.44,
+    fontFace: F.displayXBold, fontSize: 23, color: C.ground, margin: 0, valign: 'middle',
+  });
+  chrome(s, {
+    text: 'Industry average', x: G.marginX + plotW + 0.95, y: benchY - 0.22, w: chipW - 1.05,
+    color: C.ground,
+  });
+}
+
+// ─── Indicators ───────────────────────────────────────────────────────────────
+
+function renderIndicators(pptx: Deck, slide: Extract<DeckSlide, { kind: 'indicators' }>, num: number) {
+  const s = m1(pptx, { eyebrow: '02 · Measures', number: num, title: 'Key UX Indicators' });
+
+  const rowH = 0.66;
+  let y = G.fieldTop;
+  rule(s, pptx, G.marginX, y, G.contentW);
+  y += 0.1;
+
+  slide.metrics.slice(0, 6).forEach((m, i, arr) => {
+    s.addText(m.label, {
+      x: G.marginX, y, w: G.contentW - 3.2, h: rowH - 0.12,
+      fontFace: F.displaySemi, fontSize: T.rowTitle.size, charSpacing: T.rowTitle.spacing,
+      color: C.ink, margin: 0, valign: 'middle',
+    });
+    s.addText(m.value, {
+      x: G.marginX + G.contentW - 3.2, y, w: 2.0, h: rowH - 0.12,
+      fontFace: F.displayXBold, fontSize: 20, color: C.ink, align: 'right', margin: 0, valign: 'middle',
+    });
+    if (m.change !== undefined) {
+      s.addText(`${m.change >= 0 ? '+' : ''}${round2(m.change)}`, {
+        x: G.marginX + G.contentW - 1.1, y, w: 1.1, h: rowH - 0.12,
+        fontFace: F.displaySemi, fontSize: T.rowTitle.size, color: C.deepViolet,
+        align: 'right', margin: 0, valign: 'middle',
+      });
+    }
+    y += rowH;
+    rule(s, pptx, G.marginX, y, G.contentW, i === arr.length - 1 ? R.structural : R.hairline,
+         i === arr.length - 1 ? C.ink40 : C.ink25);
+    y += 0.06;
+  });
+}
+
+// ─── Recommendations ──────────────────────────────────────────────────────────
+
+function renderRecommendations(pptx: Deck, slide: Extract<DeckSlide, { kind: 'recommendations' }>, num: number) {
+  const s = m1(pptx, { eyebrow: '03 · Response', number: num, title: 'Recommendations' });
+
+  const rowH = 0.78;
+  let y = G.fieldTop;
+  rule(s, pptx, G.marginX, y, G.contentW);
+  y += 0.09;
+
+  slide.items.slice(0, 5).forEach((r, i, arr) => {
+    s.addText(String(i + 1), {
+      x: G.marginX, y, w: 0.51, h: rowH - 0.12,
+      fontFace: F.displayXBold, fontSize: 20, color: C.violet, margin: 0, valign: 'middle',
+    });
+    s.addText(clamp(r.title, 72), {
+      x: G.marginX + 0.51, y, w: G.contentW - 0.51, h: 0.36,
+      fontFace: F.displaySemi, fontSize: T.rowTitle.size, charSpacing: T.rowTitle.spacing,
+      color: C.ink, margin: 0, valign: 'top',
+    });
+    if (r.description) {
+      s.addText(clamp(r.description, 90), {
+        x: G.marginX + 0.51, y: y + 0.34, w: G.contentW - 0.51, h: 0.3,
+        fontFace: F.display, fontSize: T.caption.size, color: C.ink55, margin: 0, valign: 'top',
+      });
+    }
+    y += rowH;
+    rule(s, pptx, G.marginX, y, G.contentW, i === arr.length - 1 ? R.structural : R.hairline,
+         i === arr.length - 1 ? C.ink40 : C.ink25);
+    y += 0.05;
+  });
+}
+
+// ─── Contents ─────────────────────────────────────────────────────────────────
+
+function renderContents(pptx: Deck, slide: Extract<DeckSlide, { kind: 'contents' }>, num: number) {
+  const s = m1(pptx, {
+    eyebrow: 'Contents', number: num, title: 'Contents',
+    standfirst: 'Evidence first, then the measures that quantify it, then the work it implies.',
+  });
+
+  const rowH = 0.72;
+  let y = G.fieldTop;
+  slide.rows.forEach(r => {
+    rule(s, pptx, G.marginX, y, G.contentW);
+    chrome(s, { text: r.number, x: G.marginX, y: y + 0.2, w: 0.61, color: C.violet });
+    s.addText(r.title, {
+      x: G.marginX + 0.83, y: y + 0.1, w: G.contentW - 2.5, h: 0.34,
+      fontFace: F.displaySemi, fontSize: 19, color: C.ink, margin: 0, valign: 'top',
+    });
+    s.addText(clamp(r.sub, 92), {
+      x: G.marginX + 0.83, y: y + 0.42, w: G.contentW - 2.5, h: 0.26,
+      fontFace: F.display, fontSize: T.caption.size, color: C.ink55, margin: 0, valign: 'top',
+    });
+    y += rowH;
+  });
+  rule(s, pptx, G.marginX, y, G.contentW);
+}
+
+// ─── Appendix ─────────────────────────────────────────────────────────────────
+
+function renderAppendix(pptx: Deck, slide: Extract<DeckSlide, { kind: 'appendix' }>, num: number) {
+  // The slide left up during questions, so it stays quiet — no figures,
+  // no accent (spec, slide 23).
+  const s = m1(pptx, {
+    eyebrow: 'Appendix', number: num, title: 'Appendix & Definitions',
+    standfirst: 'Every number in this deck traces to a report you uploaded.',
+  });
+
+  let y = G.fieldTop;
+  rule(s, pptx, G.marginX, y, G.contentW);
+  y += 0.16;
+
+  slide.terms.slice(0, 5).forEach((t, i, arr) => {
+    s.addText(t.term, {
+      x: G.marginX, y, w: 1.94, h: 0.5,
+      fontFace: F.displaySemi, fontSize: 16, color: C.ink, margin: 0, valign: 'top',
+    });
+    s.addText(t.definition, {
+      x: G.marginX + 2.22, y, w: G.contentW - 2.22, h: 0.5,
+      fontFace: F.display, fontSize: 14, lineSpacing: 18, color: C.ink55, margin: 0, valign: 'top',
+    });
+    y += 0.62;
+    if (i < arr.length - 1) { rule(s, pptx, G.marginX, y, G.contentW, R.hairline, C.ink25); y += 0.1; }
+  });
+  rule(s, pptx, G.marginX, y, G.contentW);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const byType = (content: ContentBlock[] | undefined, t: BlockType) =>
-  (content || []).filter((c) => c && c._type === t);
-
-const firstByType = (content: ContentBlock[] | undefined, t: BlockType) =>
-  (content || []).find((c) => c && c._type === t);
-
-/**
- * Format a numeric change into a display string with a sign and at most
- * 2 decimal places, stripping trailing zeros. Kills the floating-point
- * garbage that arises when the planning agent derives KPI changes by
- * multiplying (e.g. 9.8 × 1.1 → 10.780000000000001).
- *
- *   formatPct(10.780000000000001)  →  "+10.78%"
- *   formatPct(-0.3)                →  "-0.3%"
- *   formatPct(0)                   →  "+0%"
- */
-function formatPct(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n as number)) return '';
-  const rounded = Math.round((n as number) * 100) / 100;
-  const fixed = rounded.toFixed(2).replace(/\.?0+$/, '');
-  const sign = rounded >= 0 ? '+' : '';
-  return `${sign}${fixed}%`;
-}
-
-function clampLines(text: string, maxLines: number, charsPerLine: number): string {
-  if (!text) return '';
-  const normalised = text.replace(/\s+/g, ' ').trim();
-  const budget = maxLines * charsPerLine;
-  if (normalised.length <= budget) return normalised;
-  const truncated = normalised.slice(0, budget);
-  const lastFullStop = Math.max(
-    truncated.lastIndexOf('. '),
-    truncated.lastIndexOf('! '),
-    truncated.lastIndexOf('? '),
-  );
-  if (lastFullStop > budget * 0.4) {
-    return truncated.slice(0, lastFullStop + 1);
-  }
-  const lastSpace = truncated.lastIndexOf(' ');
-  if (lastSpace > 0) {
-    return truncated.slice(0, lastSpace).trimEnd() + '…';
-  }
-  return truncated + '…';
-}
-
-function splitCoverTitle(title: string): { period: string; sub: string } {
-  if (!title) return { period: 'Report', sub: '' };
-  const parts = title.split(/\n/).map((s) => s.trim()).filter(Boolean);
-  if (parts.length >= 2) return { period: parts[0], sub: parts.slice(1).join(' ') };
-  const m = title.match(/^(.*?)\s+(UX Report|Research Report|Executive Report|Annual Report|Report)\s*$/i);
-  if (m) return { period: m[1].trim(), sub: m[2].trim() };
-  return { period: title.trim(), sub: '' };
-}
-
-/**
- * Fit a slide 5/6 column title into the 2.9" × 1.000" title box at a
- * FIXED font size. Long titles are truncated at a word boundary near
- * 44 chars with "…" rather than scaled down, so the three columns
- * always look consistent.
- */
-function fitColumnTitle(raw: string): { text: string; size: number } {
-  const t = raw.trim();
-  if (t.length <= COLUMN_TITLE_MAX_CHARS) {
-    return { text: t, size: COLUMN_TITLE_SIZE };
-  }
-  const head = t.slice(0, COLUMN_TITLE_MAX_CHARS - 1);
-  const lastSpace = head.lastIndexOf(' ');
-  const truncated = lastSpace > 0
-    ? head.slice(0, lastSpace).trimEnd()
-    : head;
-  return { text: truncated + '…', size: COLUMN_TITLE_SIZE };
-}
-
-// ─── Loader from Sanity slidePlan ─────────────────────────────────────────────
-
-interface SanitySlide {
-  slideNumber?: number;
-  slideType?:   SlideType;
-  title?:       string;
-  subtitle?:    string;
-  content?:     ContentBlock[];
-}
-
-export function loadSlidesFromPlan(plan: any): SlideConfig[] {
-  const slides: SanitySlide[] = plan?.slides || [];
-  const defaults = buildDefaultSlides();
-  const narrative: string | undefined = plan?.narrativeArc;
-
-  const out: SlideConfig[] = [];
-  for (let i = 1; i <= 8; i++) {
-    const s = slides.find((x) => x.slideNumber === i);
-    if (!s) { out.push(defaults[i - 1]); continue; }
-
-    let content: ContentBlock[] = (s.content as ContentBlock[]) || [];
-
-    if (i === 7 && content.length === 0 && narrative) {
-      content = [{ _type: 'subtitleBlock', text: narrative }];
-    }
-
-    out.push({
-      number:  i,
-      title:   s.title || defaults[i - 1].title,
-      type:    s.slideType || defaults[i - 1].type,
-      content,
+/** Critical = violet fill, ground text; anything else = a 1 pt outline. */
+function severityChip(s: Slide, pptx: Deck, label: string, x: number, y: number) {
+  const w = 1.04, h = 0.26;
+  const critical = label === 'Critical';
+  if (critical) {
+    block(s, pptx, { x, y, w, h, color: C.violet });
+  } else {
+    s.addShape(pptx.shapes.RECTANGLE, {
+      x, y, w, h,
+      fill: { type: 'none' }, line: { color: C.ink40, width: R.structural },
     });
   }
-  return out;
+  s.addText(label.toUpperCase(), {
+    x, y, w, h,
+    fontFace: F.monoSemi, fontSize: T.eyebrow.size, charSpacing: T.eyebrow.spacing,
+    color: critical ? C.ground : C.ink, align: 'center', valign: 'middle', margin: 0,
+  });
 }
 
-// ─── Main entry ───────────────────────────────────────────────────────────────
+/** The opening clause of a consequence, short enough for one line. */
+function consequenceOf(description: string): string {
+  const first = description.split(/[.;:]/)[0];
+  return clamp(first, 26);
+}
+
+/**
+ * Drop the decimal noise a pipeline leaves on a round number — "71.0" is
+ * the same measurement as "71" and half the width at 75 pt.
+ */
+function tidyValue(v: string): string {
+  return v.trim().replace(/(\d)\.0+(?=\D|$)/g, '$1');
+}
+
+/** Step the figure down until it fits the card on one line. */
+function figureSize(value: string, widthIn: number): number {
+  for (const size of [T.metricFigure.size, 60, 48, 38]) {
+    if (value.length * 0.52 * (size / 72) <= widthIn) return size;
+  }
+  return 32;
+}
+
+function clamp(s: string, max: number): string {
+  const t = s.replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const sp  = cut.lastIndexOf(' ');
+  return (sp > max * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + '…';
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Which metric gets the single violet figure: the one furthest below its
+ * own trend, else the first that fell. Returns -1 when nothing is down, so
+ * a slide of good news stays entirely ink.
+ */
+function indexOfWorst(metrics: Metric[]): number {
+  let worst = -1;
+  let lowest = 0;
+  metrics.forEach((m, i) => {
+    if (typeof m.change === 'number' && m.change < lowest) { lowest = m.change; worst = i; }
+  });
+  return worst;
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+export type { DeckSlide, Finding, Metric, Grounding, SlideSummary };
+export { describeDeck };
+
+/** Harvest the plan, gate it against the data, and draw what survives. */
+export function planToDeck(plan: unknown, period: string, grounding?: Grounding): DeckSlide[] {
+  return buildDeck(harvestDeckData(plan, period, grounding));
+}
+
+export interface DeckOptions {
+  /**
+   * The photograph for the cover and section dividers, as a data URI. The
+   * app uploads it already greyscaled (the template never carries a colour
+   * tint, and pptxgenjs cannot desaturate). Falls back to the bundled
+   * photograph when the user has not chosen one.
+   */
+  photo?: string;
+}
 
 export async function generatePowerPoint(
-  slides:      SlideConfig[],
+  deck: DeckSlide[],
   reportLabel?: string,
+  options: DeckOptions = {},
 ): Promise<PptResult> {
   assertAssetsReady();
 
-  const pptx   = new PptxGenJS();
-  pptx.layout  = 'LAYOUT_16x9';
+  // One cast at the boundary rather than `any` through every builder.
+  const pptx = new PptxGenJS() as unknown as Deck;
+  // Define the slide at the size the spec is drawn for, so its inch
+  // positions are used verbatim rather than rescaled.
+  pptx.defineLayout({ name: BRAND.layout.name, width: BRAND.layout.width, height: BRAND.layout.height });
+  pptx.layout  = BRAND.layout.name;
   pptx.author  = BRAND.app;
   pptx.company = BRAND.app;
-  pptx.title   = reportLabel || 'UX Executive Report';
+  pptx.title   = reportLabel || 'UX Research Report';
 
-  const label = reportLabel || 'UX Executive Report';
+  const photo = options.photo || ASSETS.COVER_IMAGE;
 
-  for (const slide of slides) {
-    if (slide.number === 8) { addThankYouSlide(pptx, slide, label); continue; }
-    switch (slide.type) {
-      case 'title':   addCoverSlide(pptx, slide, label); break;
-      case 'kpi':
-        slide.number === 2
-          ? addHeadlineScoreSlide(pptx, slide, label)
-          : addKpiDashboardSlide(pptx, slide, label);
-        break;
-      case 'trend':   addTrendSlide(pptx, slide, label); break;
-      case 'issue':   addIssuesSlide(pptx, slide, label); break;
-      case 'insight': addRecommendationsSlide(pptx, slide, label); break;
-      case 'summary':
-        slide.number === 7
-          ? addSummarySlide(pptx, slide, label)
-          : addThankYouSlide(pptx, slide, label);
-        break;
+  deck.forEach((slide, i) => {
+    const num = i + 1;
+    switch (slide.kind) {
+      case 'cover':            renderCover(pptx, slide, photo); break;
+      case 'contents':         renderContents(pptx, slide, num); break;
+      case 'exec-summary':     renderExecSummary(pptx, slide, num); break;
+      case 'glance':           renderGlance(pptx, slide, num); break;
+      case 'divider':          renderDivider(pptx, slide, num, photo); break;
+      case 'finding':          renderFinding(pptx, slide, num); break;
+      case 'findings-summary': renderFindingsSummary(pptx, slide, num); break;
+      case 'trend':            renderTrend(pptx, slide, num); break;
+      case 'task-performance': renderTaskPerformance(pptx, slide, num); break;
+      case 'sus-participants': renderSusParticipants(pptx, slide, num); break;
+      case 'indicators':       renderIndicators(pptx, slide, num); break;
+      case 'recommendations':  renderRecommendations(pptx, slide, num); break;
+      case 'appendix':         renderAppendix(pptx, slide, num); break;
     }
-  }
+  });
 
-  const downloadDir = downloadsDir();
-  await fs.mkdir(downloadDir, { recursive: true });
-
+  const dir = downloadsDir();
+  await fs.mkdir(dir, { recursive: true });
   const fileName = `uxproof_report_${Date.now()}.pptx`;
-  const filePath = `${downloadDir}/${fileName}`;
-  await pptx.writeFile({ fileName: filePath });
-
-  // Always route downloads through the authenticated API endpoint —
-  // decks are written outside public/ so there is no static path to them.
-  const downloadUrl = `/api/presentations/file/${fileName}`;
+  await pptx.writeFile({ fileName: `${dir}/${fileName}` });
 
   return {
     presentationId: `ppt_${Date.now()}`,
-    slidesCount:    slides.length,
-    downloadUrl,
+    slidesCount:    deck.length,
+    downloadUrl:    `/api/presentations/file/${fileName}`,
     generatedDate:  new Date(),
   };
-}
-
-// ─── Slide 1: Cover ──────────────────────────────────────────────────────────
-
-function addCoverSlide(pptx: any, slide: SlideConfig, label: string) {
-  const s = pptx.addSlide();
-  s.background = { color: C.white };
-
-  s.addImage({
-    data: ASSETS.COVER_IMAGE,
-    x: 5.651, y: 0, w: 4.349, h: 5.625,
-    sizing: { type: 'cover', w: 4.349, h: 5.625 },
-  });
-
-  const { period, sub } = splitCoverTitle(slide.title);
-
-  s.addText(period, {
-    x: 0.079, y: 3.150, w: 5.500, h: 1.450,
-    fontFace: F.heading, fontSize: 88, color: C.black, charSpacing: K.hero,
-    valign: 'bottom', wrap: false, margin: 0, bold: false,
-  });
-
-  if (sub) {
-    s.addText(sub, {
-      x: 0.079, y: 4.620, w: 5.429, h: 0.500,
-      fontFace: F.heading, fontSize: 32, color: C.black, charSpacing: K.heading,
-      valign: 'top', wrap: true, margin: 0, bold: false,
-    });
-  }
-
-  addChrome(s, slide.number, false, label);
-}
-
-// ─── Slide 2: Headline Score ─────────────────────────────────────────────────
-// Black background; hero SUS value; 4 dark-gray KPI cards. Cards align to
-// the title's left edge.
-
-function addHeadlineScoreSlide(pptx: any, slide: SlideConfig, label: string) {
-  const s = pptx.addSlide();
-  s.background = { color: C.black };
-
-  const subtitleBlock = firstByType(slide.content, 'subtitleBlock');
-  const kpiItems      = byType(slide.content, 'kpiItem');
-
-  s.addText(slide.title || 'SUS —', {
-    x: 0.409, y: 1.100, w: 9.199, h: 1.149,
-    fontFace: F.heading, fontSize: 75, color: C.white, charSpacing: K.heading,
-    margin: 0, bold: false,
-  });
-
-  s.addText(subtitleBlock?.text || `${label} usability summary`, {
-    x: 0.409, y: 2.521, w: 8.500, h: 0.275,
-    fontFace: F.body, fontSize: 14, italic: true, color: C.white, margin: 0,
-  });
-
-  // Card layout: card edge aligned with title edge.
-  // Card width 1.910, step 2.157 → 4 cards span 0.409 … 8.788.
-  const boxXs = [0.409, 2.566, 4.722, 6.878];
-  const pctW  = 1.700;
-
-  kpiItems.slice(0, 4).forEach((kpi, i) => {
-    const bx = boxXs[i];
-    s.addShape(pptx.shapes.RECTANGLE, {
-      x: bx, y: 3.380, w: 1.910, h: 1.150,
-      fill: { color: C.grayDark }, line: { color: C.grayDark },
-    });
-    s.addText(kpi.value || '—', {
-      x: bx + 0.140, y: 3.470, w: 1.793, h: 0.420,
-      fontFace: F.headingLight, fontSize: 22, color: C.white, charSpacing: K.heading,
-      margin: 0, bold: false,
-    });
-    s.addText(kpi.label || '', {
-      x: bx + 0.140, y: 3.920, w: 1.690, h: 0.260,
-      fontFace: F.body, fontSize: 10, color: C.white, margin: 0,
-    });
-    if (kpi.change !== undefined && kpi.change !== null) {
-      s.addText(formatPct(kpi.change), {
-        x: bx + 0.140, y: 4.200, w: pctW, h: 0.260,
-        fontFace: F.body, fontSize: 10, bold: true, color: C.white,
-        align: 'right', margin: 0,
-      });
-    }
-  });
-
-  addChrome(s, slide.number, true, label);
-}
-
-// ─── Slide 3: Usability Trend ────────────────────────────────────────────────
-// Black side panel with the title; monochrome line chart. Thick line +
-// visible data symbols so single-point series still render.
-
-function addTrendSlide(pptx: any, slide: SlideConfig, label: string) {
-  const s = pptx.addSlide();
-  s.background = { color: C.white };
-
-  s.addShape(pptx.shapes.RECTANGLE, {
-    x: 0, y: 0, w: 4.349, h: 5.625,
-    fill: { color: C.black }, line: { color: C.black },
-  });
-
-  s.addText(slide.title || 'Usability\nScore\nTrend', {
-    x: 0.250, y: 2.500, w: 3.949, h: 2.899,
-    fontFace: F.heading, fontSize: 54, color: C.white, charSpacing: K.heading,
-    valign: 'top', wrap: true, margin: 0, bold: false,
-  });
-
-  const chartBlock = firstByType(slide.content, 'chartBlock');
-  const series = chartBlock?.chartData || [];
-  const valid = series.filter(
-    (sr) => sr && Array.isArray(sr.labels) && Array.isArray(sr.values) && sr.values.length > 0
-  );
-
-  if (valid.length > 0) {
-    s.addChart(pptx.charts.LINE, valid, {
-      x: 4.500, y: 0.350, w: 5.349, h: 4.999,
-      chartColors: [...BRAND.charts.seriesColors],
-      lineSize: 3.0, lineSmooth: false,
-      lineDataSymbol: 'circle',
-      lineDataSymbolSize: 8,
-      lineDataSymbolLineSize: 2,
-      showLegend: true, legendPos: 'b', legendFontSize: 9, legendFontFace: F.body,
-      catAxisLabelFontSize: 9, valAxisLabelFontSize: 9,
-      catAxisLabelFontFace: F.body, valAxisLabelFontFace: F.body,
-      catAxisLabelColor: C.gray, valAxisLabelColor: C.gray,
-      valGridLine: { color: C.divider, style: 'solid', size: 0.5 },
-      catGridLine: { style: 'none' },
-      chartArea: { fill: { color: C.white } },
-      showValue: true,
-      dataLabelFontSize: 9, dataLabelColor: C.gray, dataLabelFontFace: F.body,
-      dataLabelFormatCode: '0.0',
-    });
-  } else {
-    s.addShape(pptx.shapes.RECTANGLE, {
-      x: 4.5, y: 0.35, w: 5.35, h: 5.0,
-      fill: { color: 'F8F8F8' }, line: { color: C.divider },
-    });
-    s.addText('SUS & Task Success Trend', {
-      x: 5.0, y: 2.5, w: 4.35, h: 0.5,
-      fontFace: F.body, fontSize: 13, color: C.gray, align: 'center',
-    });
-  }
-
-  addChrome(s, slide.number, false, label);
-}
-
-// ─── Slide 4: UX Indicators ──────────────────────────────────────────────────
-// White ground, 8 black KPI cards.
-
-function addKpiDashboardSlide(pptx: any, slide: SlideConfig, label: string) {
-  const s = pptx.addSlide();
-  s.background = { color: C.white };
-
-  s.addText(slide.title || 'Key UX Indicators', {
-    x: 0.180, y: 0.700, w: 9.639, h: 0.749,
-    fontFace: F.heading, fontSize: 40, color: C.black, charSpacing: K.heading,
-    margin: 0, bold: false,
-  });
-
-  const kpis = byType(slide.content, 'kpiItem');
-  const defaultKpis: ContentBlock[] = [
-    { _type: 'kpiItem', label: 'SUS Score',         value: '—', change: 0 },
-    { _type: 'kpiItem', label: 'Task Success Rate', value: '—', change: 0 },
-    { _type: 'kpiItem', label: 'NPS',               value: '—', change: 0 },
-    { _type: 'kpiItem', label: 'Error Rate',        value: '—', change: 0 },
-    { _type: 'kpiItem', label: 'Participants',      value: '—', change: 0 },
-    { _type: 'kpiItem', label: 'Conversion Rate',   value: '—', change: 0 },
-    { _type: 'kpiItem', label: 'Avg Time on Task',  value: '—', change: 0 },
-    { _type: 'kpiItem', label: 'Findings Resolved', value: '—', change: 0 },
-  ];
-  const items = kpis.length >= 8 ? kpis.slice(0, 8) : [...kpis, ...defaultKpis].slice(0, 8);
-
-  const colX = [0.266, 2.542, 4.818, 7.094];
-  const rowY = [2.000, 3.460];
-
-  items.forEach((kpi, i) => {
-    const col = i % 4, row = Math.floor(i / 4);
-    const bx  = colX[col], by  = rowY[row];
-
-    s.addShape(pptx.shapes.RECTANGLE, {
-      x: bx, y: by, w: 2.036, h: 1.250,
-      fill: { color: C.black }, line: { color: C.black },
-    });
-    s.addText(kpi.value || '—', {
-      x: bx + 0.140, y: by + 0.150, w: 1.910, h: 0.420,
-      fontFace: F.headingLight, fontSize: 20, color: C.white, charSpacing: K.heading,
-      margin: 0, bold: false,
-    });
-    s.addText(kpi.label || '', {
-      x: bx + 0.140, y: by + 0.620, w: 1.860, h: 0.260,
-      fontFace: F.body, fontSize: 9, color: C.white, margin: 0,
-    });
-    if (kpi.change !== undefined && kpi.change !== null) {
-      s.addText(formatPct(kpi.change), {
-        x: bx + 0.140, y: by + 0.900, w: 1.770, h: 0.260,
-        fontFace: F.body, fontSize: 9, bold: true, color: C.white,
-        align: 'right', margin: 0,
-      });
-    }
-  });
-
-  addChrome(s, slide.number, false, label);
-}
-
-// ─── Slide 5: Usability Issues ───────────────────────────────────────────────
-// Three numbered columns between hairline rules; numbering in black mono.
-// Geometry matches slide 6 EXACTLY — the only difference vs slide 6 is
-// the absence of the black banner.
-
-function addIssuesSlide(pptx: any, slide: SlideConfig, label: string) {
-  const s = pptx.addSlide();
-  s.background = { color: C.white };
-
-  s.addText(slide.title || 'Top Usability Issues', {
-    x: 0.180, y: 0.700, w: 9.639, h: 0.800,
-    fontFace: F.heading, fontSize: 40, color: C.black, charSpacing: K.heading,
-    margin: 0, bold: false,
-  });
-
-  // Hairline rules — matched to slide 6: top at 1.900, bottom at 5.150,
-  // vertical dividers span the same 3.250" height.
-  s.addShape(pptx.shapes.LINE, { x: 0.260, y: 1.900, w: 9.480, h: 0, line: { color: C.gray, width: 0.75 } });
-  s.addShape(pptx.shapes.LINE, { x: 0.260, y: 5.150, w: 9.480, h: 0, line: { color: C.gray, width: 0.75 } });
-  s.addShape(pptx.shapes.LINE, { x: 3.370, y: 1.900, w: 0, h: 3.250, line: { color: C.gray, width: 0.75 } });
-  s.addShape(pptx.shapes.LINE, { x: 6.610, y: 1.900, w: 0, h: 3.250, line: { color: C.gray, width: 0.75 } });
-
-  const issues = byType(slide.content, 'issueItem');
-  const colX   = [0.330, 3.500, 6.740];
-
-  issues.slice(0, 3).forEach((issue, i) => {
-    const cx = colX[i];
-    s.addText(`0${i + 1}`, {
-      x: cx, y: 2.060, w: 0.900, h: 0.550,
-      fontFace: F.mono, fontSize: 28, color: C.black, charSpacing: 0,
-      margin: 0, bold: false,
-    });
-    const rawTitle = issue.title || `Issue ${i + 1}`;
-    const { text: safeTitle, size: titleFontSize } = fitColumnTitle(rawTitle);
-    // Title box height 1.000" so 18pt titles wrap to 2 lines cleanly.
-    s.addText(safeTitle, {
-      x: cx, y: 2.700, w: 2.900, h: 1.000,
-      fontFace: F.heading, fontSize: titleFontSize, color: C.black, charSpacing: K.heading,
-      wrap: true, valign: 'top', margin: 0, bold: false,
-    });
-    // Description: DM Sans 18pt Medium at 12pt for a lighter look.
-    s.addText((issue.description || '').slice(0, 240) || 'No description.', {
-      x: cx, y: 3.800, w: 2.900, h: 1.350,
-      fontFace: F.bodyDesc, fontSize: 12, color: C.black, wrap: true, margin: 0, valign: 'top',
-    });
-  });
-
-  addChrome(s, slide.number, false, label);
-}
-
-// ─── Slide 6: Recommendations ────────────────────────────────────────────────
-// Black banner (1.902" tall), then the same three-column geometry as
-// slide 5; numbering in black mono.
-
-function addRecommendationsSlide(pptx: any, slide: SlideConfig, label: string) {
-  const s = pptx.addSlide();
-  s.background = { color: C.white };
-
-  s.addShape(pptx.shapes.RECTANGLE, {
-    x: 0, y: 0, w: 10, h: 1.902,
-    fill: { color: C.black }, line: { color: C.black },
-  });
-
-  s.addText(slide.title || 'Recommendations', {
-    x: 0.181, y: 0.700, w: 9.639, h: 0.800,
-    fontFace: F.heading, fontSize: 40, color: C.white, charSpacing: K.heading,
-    margin: 0, bold: false,
-  });
-
-  s.addShape(pptx.shapes.LINE, { x: 0.260, y: 1.900, w: 9.480, h: 0, line: { color: C.gray, width: 0.75 } });
-  s.addShape(pptx.shapes.LINE, { x: 0.260, y: 5.150, w: 9.480, h: 0, line: { color: C.gray, width: 0.75 } });
-  s.addShape(pptx.shapes.LINE, { x: 3.370, y: 1.900, w: 0, h: 3.250, line: { color: C.gray, width: 0.75 } });
-  s.addShape(pptx.shapes.LINE, { x: 6.610, y: 1.900, w: 0, h: 3.250, line: { color: C.gray, width: 0.75 } });
-
-  const items = byType(slide.content, 'priorityItem');
-  const defaults: ContentBlock[] = [
-    { _type: 'priorityItem', title: 'Fix Checkout Friction', description: 'Address the highest-severity findings in the purchase flow first.' },
-    { _type: 'priorityItem', title: 'Simplify Onboarding',   description: 'Reduce steps and clarify progress in first-run experience.' },
-    { _type: 'priorityItem', title: 'Accessibility Pass',    description: 'Close remaining WCAG gaps surfaced in the audit.' },
-  ];
-  const list = items.length >= 3 ? items.slice(0, 3) : defaults;
-  const colX = [0.330, 3.500, 6.740];
-
-  list.forEach((item, i) => {
-    const cx = colX[i];
-    s.addText(`0${i + 1}`, {
-      x: cx, y: 2.060, w: 0.900, h: 0.550,
-      fontFace: F.mono, fontSize: 28, color: C.black, charSpacing: 0,
-      margin: 0, bold: false,
-    });
-    const rawTitle = item.title || `Recommendation ${i + 1}`;
-    const { text: safeTitle, size: titleFontSize } = fitColumnTitle(rawTitle);
-    s.addText(safeTitle, {
-      x: cx, y: 2.700, w: 2.900, h: 1.000,
-      fontFace: F.heading, fontSize: titleFontSize, color: C.black, charSpacing: K.heading,
-      wrap: true, valign: 'top', margin: 0, bold: false,
-    });
-    s.addText((item.description || '').slice(0, 240), {
-      x: cx, y: 3.800, w: 2.900, h: 1.350,
-      fontFace: F.bodyDesc, fontSize: 12, color: C.black, wrap: true, margin: 0, valign: 'top',
-    });
-  });
-
-  addChrome(s, slide.number, true, label);
-  // Footer label sits on the white area below the banner — redraw in gray
-  s.addText(label, {
-    x: CH.footerLX, y: CH.footerY, w: CH.footerLW, h: 0.114,
-    fontFace: F.mono, fontSize: 7.5, color: C.gray, margin: 0,
-  });
-}
-
-// ─── Slide 7: Research Summary ───────────────────────────────────────────────
-
-function addSummarySlide(pptx: any, slide: SlideConfig, label: string) {
-  const s = pptx.addSlide();
-  s.background = { color: C.black };
-
-  const subtitleBlock = firstByType(slide.content, 'subtitleBlock');
-  const raw = subtitleBlock?.text || 'Key usability findings for the reporting period.';
-  // 6-line budget so the planning agent's longer summaries
-  // (MAX_NARRATIVE_ARC_CHARS = 330) fit comfortably.
-  const clamped = clampLines(raw, 6, 50);
-
-  s.addText(clamped, {
-    x: 0.750, y: 1.100, w: 8.500, h: 4.000,
-    fontFace: F.headingLight, fontSize: 22, color: C.white,
-    align: 'left', valign: 'top', wrap: true, margin: 0, lineSpacingMultiple: 1.30,
-    charSpacing: K.heading,
-  });
-
-  addChrome(s, slide.number, true, label);
-}
-
-// ─── Slide 8: Thank You ──────────────────────────────────────────────────────
-
-function addThankYouSlide(pptx: any, slide: SlideConfig, label: string) {
-  const s = pptx.addSlide();
-  s.background = { color: C.white };
-
-  s.addText('Thank You', {
-    x: 0.260, y: 2.300, w: 9.479, h: 1.000,
-    fontFace: F.heading, fontSize: 64, color: C.black, charSpacing: K.hero,
-    align: 'center', margin: 0, bold: false,
-  });
-
-  const subtitleBlock = firstByType(slide.content, 'subtitleBlock');
-  const tagline = subtitleBlock?.text || label;
-  s.addText(tagline, {
-    x: 0.260, y: 3.300, w: 9.479, h: 0.400,
-    fontFace: F.mono, fontSize: 12, color: C.grayDark,
-    align: 'center', margin: 0,
-  });
-}
-
-// ─── Default slides ──────────────────────────────────────────────────────────
-
-export function buildDefaultSlides(): SlideConfig[] {
-  return [
-    { number: 1, title: 'Q1 2026\nUX Report',          type: 'title',   content: [] },
-    { number: 2, title: 'SUS —',                       type: 'kpi',     content: [] },
-    { number: 3, title: 'Usability\nScore\nTrend',     type: 'trend',   content: [] },
-    { number: 4, title: 'Key UX Indicators',           type: 'kpi',     content: [] },
-    { number: 5, title: 'Top Usability Issues',        type: 'issue',   content: [] },
-    { number: 6, title: 'Recommendations',             type: 'insight', content: [] },
-    { number: 7, title: 'Research Summary',            type: 'summary', content: [] },
-    { number: 8, title: 'Thank You',                   type: 'summary', content: [] },
-  ];
 }

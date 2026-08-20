@@ -3,9 +3,10 @@
 ## Project context
 
 uxproof is an internal tool by Katarzyna Pilarz that turns quarterly UX
-research data into client-ready, monochrome 8-slide PowerPoint decks. The user
+research data into client-ready PowerPoint decks (the Dossier template). The user
 asks in plain language ("Analyse Q3 2025", "Compare Q2 vs Q3"); the system queries the
-research database, runs a multi-agent analysis, and renders a fixed .pptx deck.
+research database, runs a multi-agent analysis, and renders a .pptx deck whose
+length follows the data available.
 The bundled dataset (client "Aurelo") is 100% fictional demo data.
 
 ### Architecture (monorepo, three services)
@@ -33,24 +34,42 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   loudly, not corrupt the deck silently. Keep schemas in sync with the GROQ
   projections and TypeScript types (`next/src/types/`).
 - **The deliverable is deterministic; only content selection is intelligent.** The deck
-  is a fixed 8-slide template (Cover → SUS headline → trend chart → 8 indicators →
-  top issues → recommendations → summary → thank-you). Don't make slide structure or
-  styling model-driven.
+  is the Dossier template — a LIBRARY of slide types, not a fixed running order.
+  Which slides appear is decided by `next/src/lib/ppt/deck-data.ts`, purely as a
+  function of the data: a slide is emitted if and only if the figures behind it
+  exist, and the deck is never padded to reach a slide count. Same data in, same
+  deck out. The model still selects and phrases the content ON a slide; it never
+  decides the deck's structure or styling.
+  - The slide plan is NOT evidence. Asked about a period whose report has an empty
+    issues array, the planning agent still emits `issueItem` blocks — so the deck is
+    clipped to what the source report actually recorded (`fetchReportGrounding` →
+    `Grounding`). Keep that ceiling in place; without it the deck grows a Findings
+    section out of content the research never contained.
 - **Single template source of truth:** `next/src/lib/branding/brand.ts` — the
-  generated DECKS are strictly monochrome (black / white / gray only, NO accent
-  colours; Space Grotesk + DM Sans + DM Mono, hairline rules). NO logos or
-  company branding anywhere in app or decks. Never hardcode template values
-  elsewhere; never reintroduce logos or accent colours into the .pptx output.
-  ONE deliberate exception: the cover photograph (`ASSETS.COVER_IMAGE` in
-  `next/src/lib/ppt-assets.ts`) stays in full colour — do not convert it to
-  grayscale.
-- **The app UI is NOT monochrome — keep the violet theme.** The web app's
-  visual identity is the violet accent: `--primary: #5B47D6` (light) /
-  `#7060e0` (dark) plus the violet-tinted neutrals in
-  `next/src/app/globals.css`, the violet logomark gradient in `top-bar.tsx` /
-  `app/icon.svg`, and violet/emerald/rose status accents across chrome
-  components. The monochrome rule above applies to the deck template only —
-  never strip colour from the app UI.
+  generated DECKS follow the Dossier build spec: ground `#F3F2F2` (never pure
+  white), ink `#201E1D`, violet accent `#6D4AF5` with deep/pale variants and four
+  flat ink tints; Schibsted Grotesk (ExtraBold / SemiBold / Regular) for everything
+  and IBM Plex Mono for uppercase chrome only. NO logos or company branding
+  anywhere in app or decks. Never hardcode a colour, face, size or margin outside
+  `brand.ts`.
+  - The slide is defined at **13.333 × 7.5 in** (a custom pptxgenjs layout), which
+    is the size the spec is drawn for, so every position in the spec is used
+    verbatim. Don't reintroduce a rescaling step.
+  - House rules from the spec, enforced at every call site: corner radius 0 on
+    every rectangle, chip and card; no shadows or gradients; text flush left
+    (only the footer credit and axis labels are centred); charts drawn with
+    rectangles, never a live chart object; and **at most one violet figure per
+    slide** — violet marks the problem, so if everything is violet nothing is.
+  - Weights are addressed by family name (`Schibsted Grotesk ExtraBold`), because
+    pptxgenjs only exposes bold on/off. Both families must be installed locally or
+    the deck reflows.
+- **The app UI has its own violet, distinct from the deck's.** The web app's
+  identity is `--primary: #5B47D6` (light) / `#7060e0` (dark) plus the
+  violet-tinted neutrals in `next/src/app/globals.css`, the violet logomark
+  gradient in `top-bar.tsx` / `app/icon.svg`, and violet/emerald/rose status
+  accents across chrome components. The deck's violet is `#6D4AF5` and lives in
+  `brand.ts`. They are separate systems — don't unify them, and don't let deck
+  tokens leak into the app or vice versa.
 - **Lightweight per-user auth, password-protected.** Accounts are email +
   password: `/api/auth/*` + `next/src/lib/auth.ts` hash the password with
   scrypt (`node:crypto` — no bcrypt/argon dependency, no external service) and

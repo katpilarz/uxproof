@@ -15,7 +15,7 @@ interface MarkdownMessageProps {
  * - Fixes inline bullet points that appear on same line as text
  * - Ensures section headings sit on their own line, separated from following bullets
  */
-function preprocessContent(content: string): string {
+export function preprocessContent(content: string): string {
   return content
     // Remove severity/category tags that appear inline before ** bold **
     // e.g. "• **[HIGH] Title**" → "• **Title**"
@@ -29,7 +29,18 @@ function preprocessContent(content: string): string {
     // react-markdown actually treats them as list items (each on its own line)
     .replace(/^\s*•\s+/gm, '- ')
     // Ensure proper spacing after horizontal rules
-    .replace(/---\n([^\n])/g, '---\n\n$1');
+    .replace(/---\n([^\n])/g, '---\n\n$1')
+    // Source citations — "(p. 2 \u00b62)" — become a token the code renderer
+    // turns into a chip. Left as raw text they read as stray punctuation in
+    // a chat bubble, and the \u00b6 glyph is the noisiest part of it.
+    .replace(/\(\s*(?:p\.\s*(\d+)\s*)?\u00b6\s*(\d+)\s*\)/g, (_m, page, para) => `\`cite:${page ?? ''}:${para}\``);
+}
+
+/** "cite:2:5" → { page: '2', para: '5' }, or null for ordinary code. */
+export function parseCitation(children: React.ReactNode): { page: string; para: string } | null {
+  const raw = Array.isArray(children) ? children.join('') : String(children ?? '');
+  const m = /^cite:(\d*):(\d+)$/.exec(raw.trim());
+  return m ? { page: m[1], para: m[2] } : null;
 }
 
 export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
@@ -97,6 +108,26 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
 
           // ── Code ───────────────────────────────────────────────────────────
           code: ({ children, className: codeClass }) => {
+            // A verified source citation, not code: shown as a quiet chip
+            // carrying the page, with the exact location in the tooltip.
+            const cite = parseCitation(children);
+            if (cite) {
+              const label = cite.page ? `p.${cite.page}` : `para. ${cite.para}`;
+              const title = cite.page
+                ? `Source: page ${cite.page}, paragraph ${cite.para}`
+                : `Source: paragraph ${cite.para}`;
+              return (
+                <span
+                  title={title}
+                  className="inline-flex items-center align-baseline ml-1 px-1.5 py-px rounded
+                             bg-violet-500/10 text-violet-700 dark:text-violet-300
+                             text-[11px] font-mono leading-tight whitespace-nowrap"
+                >
+                  {label}
+                </span>
+              );
+            }
+
             const isBlock = codeClass?.includes('language-');
             if (isBlock) {
               return (

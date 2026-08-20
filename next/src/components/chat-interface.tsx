@@ -29,10 +29,11 @@
 
 import { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence }   from 'framer-motion';
-import { Send, Sparkles, FileText, TrendingUp, BarChart3, AlertCircle, Plus } from 'lucide-react';
+import { Send, Sparkles, FileText, TrendingUp, BarChart3, AlertCircle, Plus, CornerDownRight } from 'lucide-react';
 import { Button }              from '@/components/ui/button';
 import { Badge }               from '@/components/ui/badge';
 import { Textarea }            from '@/components/ui/textarea';
+import type { Message }        from '@/types';
 import { PresentationPreview } from './presentation-preview';
 import { WelcomeEmptyState }   from './welcome-empty-state';
 import { MessageContextTag }   from './message-context-tag';
@@ -84,11 +85,148 @@ const panelVariants = {
   exit:    { opacity: 0, y: -4, transition: { duration: 0.12 } },
 };
 
-const QUICK_ACTIONS = [
-  { icon: Sparkles,   label: 'Generate 2025 presentation',    color: 'text-violet-600 dark:text-violet-400' },
-  { icon: BarChart3,    label: 'Compare Q3 vs Q4 2025',         color: 'text-rose-600 dark:text-rose-400' },
-  { icon: TrendingUp, label: 'Generate Q1 2026 presentation', color: 'text-emerald-600 dark:text-emerald-400' },
-];
+// ─── Suggestion chips ─────────────────────────────────────────────────────────
+//
+// These used to be three constants — "Generate 2025 presentation", "Compare
+// Q3 vs Q4 2025", "Generate Q1 2026 presentation" — periods left over from
+// the demo seed. Since every report now comes from the user's own upload,
+// those chips offered a one-click route to a guaranteed "no research data
+// for that period" error, and they went stale the moment the scope changed.
+//
+// They're built from GET /api/reports instead: the periods the user
+// actually has, newest first. Someone with nothing uploaded is offered the
+// upload path, not a query that cannot succeed.
+
+interface UserPeriod {
+  quarter:      string;
+  year:         number;
+  /** CSV uploads carry metrics only — no issues or insights to ask about. */
+  hasIssues?:   boolean;
+  hasInsights?: boolean;
+}
+
+interface QuickAction {
+  icon:  React.ElementType;
+  label: string;
+  color: string;
+}
+
+function buildQuickActions(periods: UserPeriod[], fileCount: number): QuickAction[] {
+  const actions: QuickAction[] = [];
+
+  if (fileCount > 0) {
+    actions.push({
+      icon:  FileText,
+      label: 'Summarize my files',
+      color: 'text-violet-600 dark:text-violet-400',
+    });
+  }
+
+  if (periods.length === 0) return actions;
+
+  const [latest, previous] = periods;
+
+  actions.push({
+    icon:  Sparkles,
+    label: `Generate ${latest.quarter} ${latest.year} presentation`,
+    color: 'text-emerald-600 dark:text-emerald-400',
+  });
+
+  if (previous) {
+    // Both periods carry their year so the comparison parses across a year
+    // boundary ("Compare Q4 2025 vs Q1 2026"), not just within one.
+    actions.push({
+      icon:  BarChart3,
+      label: `Compare ${previous.quarter} ${previous.year} vs ${latest.quarter} ${latest.year}`,
+      color: 'text-rose-600 dark:text-rose-400',
+    });
+  } else {
+    actions.push({
+      icon:  TrendingUp,
+      label: `Analyse ${latest.quarter} ${latest.year}`,
+      color: 'text-rose-600 dark:text-rose-400',
+    });
+  }
+
+  return actions;
+}
+
+// ─── Follow-up suggestions ────────────────────────────────────────────────────
+//
+// After an answer, offer the next questions worth asking — the same idea as
+// the welcome chips, but about what was just discussed. Derived from the
+// reply's own metadata and the user's real periods, so every suggestion is
+// a query that will actually resolve.
+//
+// Only the newest assistant message shows them: on every message the
+// transcript would turn into a wall of buttons.
+
+/** "Q3 2026" out of a context label like "Q3 2026" or "Full Year 2026". */
+function periodFromLabel(label?: string): { quarter: string; year: number } | null {
+  const m = label?.match(/\b(Q[1-4])\s+(\d{4})\b/i);
+  return m ? { quarter: m[1].toUpperCase(), year: parseInt(m[2]) } : null;
+}
+
+function buildFollowUps(
+  message:  Message,
+  lastUser: string,
+  periods:  UserPeriod[],
+): string[] {
+  if (message.role !== 'assistant' || message.isError) return [];
+
+  const label = message.contextRef?.quarter;
+
+  // A clarification or upload prompt already spells out what to try — adding
+  // chips underneath would just say it twice.
+  if (!label || label === 'File summary') {
+    if (label !== 'File summary' || !periods.length) return [];
+    const latest = periods[0];
+    return [
+      `Analyse ${latest.quarter} ${latest.year}`,
+      `Generate ${latest.quarter} ${latest.year} presentation`,
+    ];
+  }
+
+  const period = periodFromLabel(label);
+  if (!period) return [];
+  const p = `${period.quarter} ${period.year}`;
+
+  const candidates: string[] = [];
+  const here = periods.find(x => x.quarter === period.quarter && x.year === period.year);
+
+  // The deck card is already on screen — point somewhere else. Qualitative
+  // questions are only offered when the period actually has that content:
+  // a CSV upload carries metrics alone, and suggesting "what are the
+  // recommendations?" for one leads straight to "there are none".
+  if (!message.showPresentation) {
+    if (here?.hasIssues)   candidates.push(`What are the top issues for ${p}?`);
+    if (here?.hasInsights) candidates.push(`What are the recommendations for ${p}?`);
+  }
+
+  const other = periods.find(x => !(x.quarter === period.quarter && x.year === period.year));
+  if (other) {
+    const [a, b] = other.year < period.year ||
+      (other.year === period.year && other.quarter < period.quarter)
+      ? [`${other.quarter} ${other.year}`, p]
+      : [p, `${other.quarter} ${other.year}`];
+    candidates.push(`Compare ${a} vs ${b}`);
+  }
+
+  if (!message.showPresentation) candidates.push(`Generate ${p} presentation`);
+
+  // Don't offer back what was just asked.
+  const asked = lastUser.toLowerCase();
+  const topicAlreadyAsked = (c: string) => {
+    const t = c.toLowerCase();
+    if (/top issues/.test(t)   && /\bissues?\b|\bfindings?\b/.test(asked))    return true;
+    if (/recommendations/.test(t) && /\brecommendations?\b/.test(asked))       return true;
+    if (/^compare/.test(t)     && /\bcompare\b|\bvs\b|\bversus\b/.test(asked)) return true;
+    if (/presentation/.test(t) && /\bpresentation\b|\bdeck\b|\bpptx\b/.test(asked)) return true;
+    return false;
+  };
+
+  return candidates.filter(c => !topicAlreadyAsked(c)).slice(0, 3);
+}
 
 export function ChatInterface() {
   const messages        = useMessages();
@@ -103,10 +241,28 @@ export function ChatInterface() {
   const [input,       setInput]       = useState('');
   const [lastQuery,   setLastQuery]   = useState('');
   const [streamedIds, setStreamedIds] = useState<Set<string>>(new Set());
+  const [userData, setUserData] = useState<{ periods: UserPeriod[]; fileCount: number }>({
+    periods: [], fileCount: 0,
+  });
+  const quickActions = buildQuickActions(userData.periods, userData.fileCount);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef  = useRef<HTMLDivElement>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
+
+  // What the user actually has — drives the suggestion chips. Re-read when
+  // the session changes, so chips reflect a file uploaded in the meantime.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/reports', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : { periods: [], fileCount: 0 }))
+      .then(data => {
+        if (cancelled) return;
+        setUserData({ periods: data.periods ?? [], fileCount: data.fileCount ?? 0 });
+      })
+      .catch(e => console.warn('[chat-interface] suggestions load failed:', e));
+    return () => { cancelled = true; };
+  }, [activeSessionId]);
 
   const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -334,6 +490,38 @@ export function ChatInterface() {
                       })}
                     </span>
                   </div>
+
+                  {/* Where to go next — only under the newest reply, and not
+                      while another answer is still being generated. */}
+                  {idx === messages.length - 1 && !isProcessing && (() => {
+                    const followUps = buildFollowUps(message, lastQuery, userData.periods);
+                    if (!followUps.length) return null;
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15, duration: 0.2 }}
+                        className="flex flex-wrap gap-2 px-1 pt-2"
+                      >
+                        {followUps.map(text => (
+                          // Same weight as the "Summarize" action on /files:
+                          // outline + sm + violet icon. These are real
+                          // actions, so they read as buttons rather than as
+                          // greyed-out hints.
+                          <Button
+                            key={text}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSend(text)}
+                            className="gap-1.5 text-xs shadow-sm hover:border-violet-400 dark:hover:border-violet-500"
+                          >
+                            <CornerDownRight className="size-3.5 text-violet-600 dark:text-violet-400" />
+                            {text}
+                          </Button>
+                        ))}
+                      </motion.div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             );
@@ -390,7 +578,7 @@ export function ChatInterface() {
                     <span className="text-xs">Upload a report</span>
                   </Button>
                 </motion.div>
-                {QUICK_ACTIONS.map((action, i) => (
+                {quickActions.map((action, i) => (
                   <motion.div
                     key={action.label}
                     initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}

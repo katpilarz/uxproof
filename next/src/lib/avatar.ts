@@ -1,9 +1,11 @@
-// lib/avatar.ts — server-only avatar upload, shared by /api/auth/register
-// and /api/auth/profile so both enforce exactly the same limits.
+// lib/avatar.ts — server-only image upload, shared by /api/auth/register,
+// /api/auth/profile and /api/deck-image so they all enforce the same limits.
 
 import { writeClient } from '@/lib/sanity';
 
 export const MAX_AVATAR_BYTES = 4 * 1024 * 1024; // 4MB
+/** Deck photographs are full-bleed, so they get a larger ceiling. */
+export const MAX_DECK_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB
 
 /**
  * Upload an image File to Sanity and return its asset _id. Validation
@@ -12,12 +14,15 @@ export const MAX_AVATAR_BYTES = 4 * 1024 * 1024; // 4MB
  */
 export async function uploadAvatarAsset(
   avatar: File,
+  opts: { maxBytes?: number; label?: string } = {},
 ): Promise<{ assetId: string } | { error: string }> {
-  if (avatar.size > MAX_AVATAR_BYTES) {
-    return { error: 'Avatar image must be 4MB or smaller.' };
+  const maxBytes = opts.maxBytes ?? MAX_AVATAR_BYTES;
+  const label    = opts.label ?? 'Avatar';
+  if (avatar.size > maxBytes) {
+    return { error: `${label} must be ${Math.round(maxBytes / (1024 * 1024))}MB or smaller.` };
   }
   if (!avatar.type.startsWith('image/')) {
-    return { error: 'Avatar must be an image file.' };
+    return { error: `${label} must be an image file.` };
   }
   const buffer = Buffer.from(await avatar.arrayBuffer());
   const asset  = await writeClient.assets.upload('image', buffer, {

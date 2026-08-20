@@ -208,3 +208,130 @@ export const SEVERITY_MAP: Record<string, string> = {
   moderate: 'medium', medium: 'medium',
   minor: 'low', trivial: 'low', low: 'low',
 };
+
+// ─── Detailed research arrays ────────────────────────────────────────────────
+//
+// tasks / participantScores / quotes carry the evidence the Dossier deck's
+// richest slides are built from. They go through the same rule as every
+// scalar: a value the source document does not contain is dropped, not
+// shown. A fabricated quote is the worst of these — it puts words in a
+// participant's mouth — so it is matched against the document text.
+
+export interface ParsedTask {
+  code:         string;
+  name?:        string;
+  successRate?: number;
+  medianTime?:  string;
+  errors?:      number;
+}
+
+export interface ParsedParticipantScore {
+  participant: string;
+  score:       number;
+}
+
+export interface ParsedQuote {
+  text:         string;
+  attribution?: string;
+}
+
+/** Whitespace/punctuation-insensitive containment, for prose matching. */
+function looseIncludes(source: string, needle: string): boolean {
+  const norm = (t: string) =>
+    t.toLowerCase()
+      .replace(/[\u2018\u2019\u02bc]/g, "'")
+      .replace(/[\u201c\u201d]/g, '"')
+      .replace(/[\u2010-\u2015\u2212]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+  return norm(source).includes(norm(needle));
+}
+
+/** Tasks whose stated numbers all appear in the document. */
+export function groundTasks(raw: unknown, document: string): ParsedTask[] {
+  if (!Array.isArray(raw)) return [];
+  // Numbers are compared against a comma-stripped copy ("1,250" vs 1250);
+  // prose is compared against the document as written.
+  const source = document.replace(/,/g, '');
+  const out: ParsedTask[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const code = String(o.code ?? '').trim();
+    if (!/^T\d{1,2}$/i.test(code)) continue;
+
+    const task: ParsedTask = { code: code.toUpperCase() };
+    const name = String(o.name ?? '').trim();
+    if (name) task.name = name;
+
+    for (const field of ['successRate', 'errors'] as const) {
+      const v = o[field];
+      if (v == null) continue;
+      if (numberAppearsIn(source, v)) task[field] = Number(v);
+      else console.warn(`[report-parsing] task ${code}: dropped ${field}`, v);
+    }
+    // A time like "3:31" is matched as written, not as a number.
+    const time = String(o.medianTime ?? '').trim();
+    if (time && looseIncludes(document, time)) task.medianTime = time;
+
+    // A task row with no verified figure is just a label — not evidence.
+    if (task.successRate !== undefined || task.errors !== undefined || task.medianTime) {
+      out.push(task);
+    }
+  }
+  return out;
+}
+
+/** Per-participant SUS scores that appear in the document. */
+export function groundParticipantScores(raw: unknown, document: string): ParsedParticipantScore[] {
+  if (!Array.isArray(raw)) return [];
+  const source = document.replace(/,/g, '');
+  const out: ParsedParticipantScore[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const participant = String(o.participant ?? '').trim().toUpperCase();
+    const score = Number(o.score);
+    if (!/^P\d{1,3}$/.test(participant) || !Number.isFinite(score)) continue;
+    if (score < 0 || score > 100) continue;
+    if (seen.has(participant)) continue;
+    if (!numberAppearsIn(source, score)) {
+      console.warn(`[report-parsing] ${participant}: SUS ${score} not in document — dropped`);
+      continue;
+    }
+    seen.add(participant);
+    out.push({ participant, score });
+  }
+  return out;
+}
+
+/**
+ * Quotes the document actually contains. This is the strictest gate here:
+ * an invented quote attributes words to a real participant, so anything
+ * that cannot be found verbatim is discarded rather than paraphrased in.
+ */
+export function groundQuotes(raw: unknown, document: string): ParsedQuote[] {
+  if (!Array.isArray(raw)) return [];
+  // Quotes are prose: they must be matched against the document as
+  // written. Comparing against a comma-stripped copy silently rejected
+  // every quote containing a comma — which is most of them.
+  const out: ParsedQuote[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const text = String(o.text ?? '').trim().replace(/^["\u201c]|["\u201d]$/g, '');
+    if (text.length < 20) continue;                 // too short to be a quotation
+    if (!looseIncludes(document, text)) {
+      console.warn('[report-parsing] quote not found in document — dropped:', text.slice(0, 50));
+      continue;
+    }
+    const quote: ParsedQuote = { text };
+    const attribution = String(o.attribution ?? '').trim();
+    if (attribution && looseIncludes(document, attribution.split('\u00b7')[0].trim())) {
+      quote.attribution = attribution;
+    }
+    out.push(quote);
+  }
+  return out;
+}

@@ -37,7 +37,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createUnifiedAI } from '@/lib/agents/unified-agent';
 import { AIContext } from '@/types';
-import { createChatSession, appendMessageToSession, countUserFiles, getUserFileByName } from '@/lib/sanity';
+import { createChatSession, appendMessageToSession, countUserFiles, getUserFiles, getUserFileByName } from '@/lib/sanity';
 import { countUserReports, fetchLatestReport } from '@/lib/services/report-query';
 import { aiDocumentSummary, fallbackTextSummary } from '@/lib/file-analysis';
 import { getCurrentUser } from '@/lib/auth';
@@ -84,6 +84,12 @@ async function conversationalize(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model:    OLLAMA_MODEL,
+        // qwen3.5 and other reasoning models emit a chain-of-thought that
+        // consumes the token budget and leaves `content` empty — every
+        // grounded answer here would silently fall back to the template.
+        // Ollama ignores this on non-reasoning models, so it is safe to
+        // send unconditionally.
+        think:   false,
         stream:   false,
         options:  { temperature: 0.3, num_predict: 400 },
         messages: [
@@ -113,7 +119,13 @@ async function conversationalize(
 
     if (!res.ok) return null;
     const data  = await res.json();
-    const reply = (data?.message?.content ?? '').trim();
+    let   reply = (data?.message?.content ?? '').trim();
+
+    // Some models wrap the whole answer in a ```md fence. Left alone that
+    // renders as a literal code block — the markdown shows as source.
+    const fenced = reply.match(/^```(?:[a-z]+)?\s*\n([\s\S]*?)\n?```$/i);
+    if (fenced) reply = fenced[1].trim();
+
     if (reply.length < 20) return null;
 
     // Guardrail: every substantial number in the reply must appear in the
@@ -149,12 +161,23 @@ function extractFilename(message: string): string | null {
   return bare ? bare[1].trim() : null;
 }
 
-function classifyMessage(message: string): 'casual' | 'presentation' | 'deep' | 'data' | 'file-summary' {
+function classifyMessage(message: string): 'casual' | 'presentation' | 'deep' | 'data' | 'file-summary' | 'files-overview' {
   const lower = message.toLowerCase().trim();
 
   // "Summarize the file lumen.pdf" — the active prompt from /files (also
   // works typed by hand). Must win over the 'deep' summarise match.
   if (/\bsummar(y|ise|ize)\b/i.test(lower) && extractFilename(message)) return 'file-summary';
+
+  // "Summarize my files" / "what have I uploaded?" — about the documents
+  // themselves, not a research period. Without this it fell through to the
+  // 'deep' branch and answered with a period analysis, which is not what
+  // was asked and not what the suggestion chip promises.
+  if (
+    (/\bsummar(y|ise|ize)\b/i.test(lower) && /\bfiles?\b|\bdocuments?\b|\buploads?\b/i.test(lower)) ||
+    /\bwhat (have i|did i|do i have) uploaded\b|\bwhat files\b|\bmy (files|uploads|documents)\b/i.test(lower)
+  ) {
+    return 'files-overview';
+  }
 
   const hasData = /\b(q[1-4]|quarter|sus|nps|task success|error rate|conversion|participant|usability|kpi|metric|issue|finding|insight|report|research|performance|compare|versus|year|annual|2[0-9]{3}|h[12]|half|analyse|analyze|analysis|overview|summary|accessib)\b/i.test(message);
 
@@ -184,15 +207,15 @@ function classifyMessage(message: string): 'casual' | 'presentation' | 'deep' | 
 function casualReply(message: string): string {
   const q = message.toLowerCase().trim();
   if (/^(hi|hello|hey)\b/.test(q) || /^good (morning|afternoon|evening)/.test(q)) {
-    return `Hello! I'm the **uxproof research assistant**.\n\nI can help you with:\n\n• **Analyse a quarter** — _"Analyse Q3 2025"_ or _"What is the SUS score for Q4 2025?"_\n• **Compare periods** — _"Compare Q3 vs Q4 2025"_\n• **Full year overviews** — _"Full year 2025 overview"_\n• **Generate presentations** — _"Generate Q4 2025 presentation"_ or _"Generate 2025 presentation"_\n• **Deep AI analysis** — _"Deep analysis Q3 2025"_\n\nWhat would you like to explore?`;
+    return `Hello! I'm the **uxproof research assistant**.\n\nI can help you with:\n\n• **See what you have** — _"Summarize my files"_\n• **Analyse a period** — _"Analyse my latest quarter"_ or name one, _"Analyse Q3 2026"_\n• **Compare periods** — _"Compare Q3 2026 vs Q4 2026"_\n• **Full year overviews** — _"Full year 2026 overview"_\n• **Generate presentations** — _"Generate a presentation"_ for your latest period\n\nWhat would you like to explore?`;
   }
   if (/how (can|do) you help/.test(q) || /what can you do/.test(q) || /^help\b/.test(q)) {
-    return `I'm the **uxproof research assistant** — I turn **your uploaded** UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Summarize research files you upload with the **+** button (CSV, JSON, TXT, Markdown, PDF)\n• Query SUS, task success, NPS, error-rate and conversion data from your uploaded quarters\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• Upload a report via **+**, then _"What is the SUS score for Q4 2025?"_\n• _"Compare Q3 vs Q4 2025"_\n• _"Generate 2025 presentation"_`;
+    return `I'm the **uxproof research assistant** — I turn **your uploaded** UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Summarize research files you upload with the **+** button (CSV, JSON, TXT, Markdown, PDF)\n• Query SUS, task success, NPS, error-rate and conversion data from your uploaded quarters\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• _"Summarize my files"_\n• _"Analyse my latest quarter"_\n• _"Generate a presentation"_`;
   }
-  if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Generate Q4 2025 presentation"_ or _"Analyse Q3 2025"_`;
-  if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse Q3 2025"_`;
+  if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Summarize my files"_ or _"Generate a presentation"_`;
+  if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse my latest quarter"_`;
   if (/^(thanks|thank you)/.test(q)) return `You're welcome! Let me know if you need any other analysis or a presentation.`;
-  return `I can help you analyse UX research data and generate presentations. Try: _"Analyse Q3 2025"_`;
+  return `I can help you analyse the research you've uploaded and generate presentations. Try: _"Summarize my files"_`;
 }
 
 /**
@@ -311,7 +334,7 @@ const FIXED_DECK_ANSWER =
   `That consistency is the point — the decks go to clients, so they're all ` +
   `laid out the same way.\n\n` +
   `What I can do is generate the full deck and let you keep the one slide you ` +
-  `need: **_"Generate Q3 2026 presentation"_**. Once it's downloaded, delete ` +
+  `need: **_"Generate a presentation"_**. Once it's downloaded, delete ` +
   `the slides you don't want in PowerPoint or Keynote.`;
 
 /**
@@ -582,6 +605,42 @@ export async function POST(request: NextRequest) {
       contextRefOverride = response.contextRef;
       agentInfo          = response.agentInfo || { agent: 'uxproof assistant', processingTime: '—' };
 
+    } else if (intent === 'files-overview') {
+      // What the user has uploaded, straight from their own documents.
+      // Deterministic on purpose — this is a directory listing, not an
+      // analysis, so there is nothing here for a model to get wrong.
+      const t0    = Date.now();
+      const files = (await getUserFiles(user.id)) ?? [];
+      contextRefOverride = { project: 'Your files', quarter: 'File summary' };
+
+      if (!files.length) {
+        responseContent =
+          `You haven't uploaded anything yet — my answers are based entirely on **what you upload**.\n\n` +
+          `Click the **+** button next to the chat input to add a report (CSV, JSON, PDF, TXT or Markdown).`;
+      } else if (files.length === 1) {
+        const f = files[0];
+        const periods = (f.reportsCreated ?? []).join(', ');
+        responseContent =
+          `**${f.filename}**${periods ? ` — research data filed under **${periods}**` : ''}\n\n` +
+          (f.summary || '_No summary was stored for this file._');
+      } else {
+        const rows = files.map((f: { filename: string; reportsCreated?: string[] }) => {
+          const periods = (f.reportsCreated ?? []).filter(Boolean);
+          return `• **${f.filename}**${
+            periods.length ? ` — ${periods.join(', ')}` : ' — no research periods extracted'
+          }`;
+        });
+        const allPeriods = [...new Set(
+          files.flatMap((f: { reportsCreated?: string[] }) => f.reportsCreated ?? []).filter(Boolean)
+        )];
+        responseContent =
+          `You have **${files.length} files** uploaded:\n\n${rows.join('\n')}\n\n` +
+          (allPeriods.length
+            ? `Between them they cover **${allPeriods.join(', ')}**. Ask me to analyse any of those periods, or say _"Summarize <filename>"_ for a full summary of one document.`
+            : `None of them produced research data — ask me anything about their contents instead.`);
+      }
+      agentInfo = { agent: 'uxproof assistant', processingTime: `${((Date.now() - t0) / 1000).toFixed(1)}s` };
+
     } else if (intent === 'file-summary') {
       // "Summarize the file <name>" — the active prompt from /files. Runs a
       // fresh grounded summary of the stored document text (with [page N]
@@ -643,7 +702,7 @@ export async function POST(request: NextRequest) {
       // the local LLM so the reply addresses the QUESTION instead of
       // dumping the whole record. Falls back to the template untouched
       // when Ollama is unavailable or the guardrail trips.
-      if (!showPresentation && responseContent.trim()) {
+      if (!showPresentation && !response.isMeta && responseContent.trim()) {
         const t0 = Date.now();
         const conversational = await conversationalize(message, responseContent, history);
         if (conversational) {

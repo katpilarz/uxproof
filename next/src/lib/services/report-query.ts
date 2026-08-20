@@ -166,11 +166,94 @@ export async function fetchLatestReport(userId: string): Promise<SanityReport | 
   );
 }
 
+/** Everything the deck is allowed to draw on, straight from the report. */
+export interface ReportFacts {
+  issues:   number;
+  insights: number;
+  metrics:  string[];
+  tasks:             Array<{ code: string; name?: string; successRate?: number; medianTime?: string; errors?: number }>;
+  participantScores: Array<{ participant: string; score: number }>;
+  quotes:            Array<{ text: string; attribution?: string }>;
+}
+
+/**
+ * What a period's report actually recorded, for grounding the deck. The
+ * slide plan is derived output and can carry findings the report never
+ * had — asked about a period with an empty issues array, the planning
+ * agent still emits issueItem blocks. These counts are the source of
+ * truth the deck is clipped to.
+ */
+export async function fetchReportGrounding(
+  userId:   string,
+  year:     number,
+  quarter?: string,
+): Promise<ReportFacts> {
+  const row = await sanity.fetch(
+    `*[_type == "report" && user._ref == $userId && year == $year${
+      quarter ? ' && quarter == $quarter' : ''
+    }] | order(quarter desc)[0]{
+      "issues":   coalesce(count(issues[]),   0),
+      "insights": coalesce(count(insights[]), 0),
+      susScore, susChange, taskSuccessRate, npsScore,
+      participants, errorRate, conversionRate,
+      tasks[]{ code, name, successRate, medianTime, errors },
+      participantScores[]{ participant, score },
+      quotes[]{ text, attribution }
+    }`,
+    quarter ? { userId, year, quarter } : { userId, year },
+  );
+
+  // A metric counts as recorded only when the report holds an actual
+  // number for it — null means the study never measured it, and a deck
+  // card reading "+0" for such a metric is an invention.
+  const METRIC_FIELDS = [
+    'susScore', 'susChange', 'taskSuccessRate', 'npsScore',
+    'participants', 'errorRate', 'conversionRate',
+  ] as const;
+  const metrics = METRIC_FIELDS.filter(f => typeof row?.[f] === 'number');
+
+  return {
+    issues:   row?.issues ?? 0,
+    insights: row?.insights ?? 0,
+    metrics,
+    tasks:             Array.isArray(row?.tasks) ? row.tasks : [],
+    participantScores: Array.isArray(row?.participantScores) ? row.participantScores : [],
+    quotes:            Array.isArray(row?.quotes) ? row.quotes : [],
+  };
+}
+
 export async function fetchAllReports(userId: string): Promise<SanityReport[]> {
   return sanity.fetch(
     `*[_type == "report" && user._ref == $userId] | order(year asc, quarter asc) { ${REPORT_FRAGMENT} }`,
     { userId }
   );
+}
+
+/**
+ * Just the periods this user has data for, newest first — enough to build
+ * suggestions and "what data do I have?" answers without pulling every
+ * metric of every report.
+ */
+export interface UserPeriod {
+  quarter: Quarter;
+  year:    number;
+  /** Whether this period has qualitative content behind it. CSV uploads
+   *  carry metrics only, so suggesting "what are the recommendations?" for
+   *  one would lead straight to "there are none". */
+  hasIssues:   boolean;
+  hasInsights: boolean;
+}
+
+export async function fetchUserPeriods(userId: string): Promise<UserPeriod[]> {
+  const rows: UserPeriod[] = await sanity.fetch(
+    `*[_type == "report" && user._ref == $userId] | order(year desc, quarter desc) {
+      quarter, year,
+      "hasIssues":   coalesce(count(issues[])   > 0, false),
+      "hasInsights": coalesce(count(insights[]) > 0, false)
+    }`,
+    { userId }
+  );
+  return rows ?? [];
 }
 
 /** How many reports this user has — the "do you have any data yet?" gate. */

@@ -47,6 +47,17 @@ export default {
       options: { hotspot: true },
     },
     {
+      name: 'deckImage',
+      title: 'Deck Photograph',
+      type: 'image',
+      options: { hotspot: true },
+      description:
+        'The photograph used on the deck cover and section dividers. Uploaded ' +
+        'through the app, which converts it to greyscale first — the Dossier ' +
+        'template never carries a colour tint. Falls back to the bundled ' +
+        'photograph when unset.',
+    },
+    {
       name: 'createdAt',
       title: 'First Signed In',
       type: 'datetime',
