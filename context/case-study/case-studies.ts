@@ -74,41 +74,45 @@ export const caseStudies: CaseStudy[] = [
   {
     slug: "uxproof",
     index: "01",
-    title: "uxproof — AI research reporting",
-    tag: "AI product / UX engineering / Design systems",
+    title: "uxproof — engineering reliable AI experiences",
+    tag: "UX engineering / AI product / Design systems",
     year: "2026",
     status: "Prototype-Built",
     summary:
-      "[ Uxproof is a " +
-      "self-initiated AI product that turns UX research into " +
-      "presentation-ready decks — designed, architected and built end to " +
-      "end in React and TypeScript, with deterministic UX and engineering " +
-      "boundaries around the model. ]",
+      "[ A self-initiated AI product designed and built end to end in React " +
+      "and TypeScript. I used UX engineering to turn an ambiguous AI " +
+      "workflow into a structured, accessible and resilient product — with " +
+      "deterministic boundaries around what the model can and cannot " +
+      "control. ]",
     card: {
       problem:
-        "Turning a quarter of research into a client deck takes days. An " +
-        "AI that presents research to a client also cannot make up a " +
-        "single number or add slides simply to look thorough.",
+        "AI can accelerate complex workflows, but it also introduces " +
+        "unreliable states, ambiguous interactions and generated UI that " +
+        "can drift from the product system.",
       approach:
-        "I designed the interaction model, built the product end to end in " +
-        "React and TypeScript, and created the design system behind it. " +
-        "The model interprets and narrates; deterministic code owns the " +
-        "facts, structure, accessibility and visual consistency.",
+        "I designed the interaction model and built the product in React " +
+        "and TypeScript, using a design system, typed contracts, " +
+        "accessibility rules and deterministic fallbacks to keep AI inside " +
+        "deliberate UX boundaries.",
       result:
-        "A working research-to-presentation workflow with traceable " +
-        "numbers, explicit edge states, deterministic fallbacks and a " +
-        "design system that turns UX quality into reusable rules.",
+        "A working prototype where interaction quality is encoded into the " +
+        "system: reusable patterns, explicit edge states, accessible " +
+        "behaviour and AI output that is evaluated against the same UX " +
+        "rules as hand-written UI.",
     },
     ledger: [
       {
         k: "[ Project ]",
-        v: "uxproof — self-initiated concept build for my own research ",
+        v:
+          "uxproof — self-initiated concept build for my own research " +
+          "practice",
       },
       {
         k: "[ Role ]",
         v:
-          "Solo build — product concept, UX, architecture, frontend, AI " +
-          "workflow and deck renderer",
+          "UX engineering lead for the concept — interaction design, " +
+          "information architecture, design system, accessibility, React " +
+          "implementation, AI workflow and presentation renderer",
       },
       {
         k: "[ Stack ]",
@@ -165,43 +169,7 @@ export const caseStudies: CaseStudy[] = [
             "headline, a row of quick actions and the composer at the bottom",
         },
       },
-      {
-        heading: "Workflow",
-        lead:
-          "The information architecture follows the researcher's workflow, " +
-          "not the model's capabilities.",
-        body: [
-          "The workflow is chat-first and upload-grounded, but the " +
-            "architecture underneath it is structured around the " +
-            "researcher's mental model. Research files become evidence; " +
-            "evidence becomes reports and periods; reports become " +
-            "conversation context; conversation becomes analysis and, " +
-            "eventually, a presentation. Files go in through the chat's plus " +
-            "button; structured data — quarter, year, SUS score — is parsed " +
-            "into per-user reports, and prose documents are converted by a " +
-            "local model under a strict guardrail. From there it's plain " +
-            "language: “Analyse Q3 2025”, “Compare Q2 vs Q3”, “Generate the " +
-            "2025 presentation”.",
-          "The conversation itself is designed, not just parsed. A bare " +
-            "“yes” after the tool offers a presentation becomes a real " +
-            "generation request; a follow-up question with no period named " +
-            "inherits the last one discussed; a workspace with no data gets " +
-            "an upload prompt instead of machinery running on nothing.",
-        ],
-        image: {
-          src: "/uxproof-app-summary.jpg",
-          fit: "contain",
-          caption:
-            "[ FILE BECOMES EVIDENCE, EVIDENCE BECOMES A FILED PERIOD — " +
-            "AND EVERY FIGURE KEEPS THE PAGE IT CAME FROM ]",
-          alt:
-            "An AI summary of an uploaded research PDF in the uxproof chat: " +
-            "metrics, key findings and recommendations, each claim followed " +
-            "by the page it was read from, and a closing line saying the " +
-            "research data was extracted and filed under Q3 2026",
-        },
-      },
-      {
+            {
         heading: "Problem",
         lead:
           "An AI presenting research to a client has to be right every time, " +
@@ -214,6 +182,15 @@ export const caseStudies: CaseStudy[] = [
             "local model will sometimes be slow, wrong, or simply down — so " +
             "the product had to keep working without it.",
         ],
+                image: {
+          src: "/uxproof-app-deck-ready.jpg",
+          fit: "contain",
+          caption:
+            "[ THE TOOL ITSELF — THE CHAT HOME EVERY REQUEST STARTS FROM ]",
+          alt:
+            "uxproof open on a laptop: the chat home with the welcome " +
+            "headline, a row of quick actions and the composer at the bottom",
+        },
       },
       {
         heading: "Thinking model",
@@ -310,9 +287,7 @@ export const caseStudies: CaseStudy[] = [
       },
       {
         heading: "Architecture",
-        lead:
-          "Clean ownership boundaries, one UX principle: the model " +
-          "interprets; deterministic code owns product behaviour.",
+        lead: "The model interprets. Code owns the facts.",
         body: [
           "The architecture is split into explicit ownership boundaries: " +
             "the Next.js app owns the interaction layer, uploads and deck " +
@@ -327,25 +302,7 @@ export const caseStudies: CaseStudy[] = [
             "malformed model output fails loudly at a validation boundary " +
             "instead of leaking into a client deck.",
         ],
-      },
-      {
-        heading: "Edge states",
-        lead: "The unhappy paths are the product.",
-        body: [
-          "Every failure mode is a designed state, not an error toast. The " +
-            "model being offline is one of them: chat answers fall back to " +
-            "deterministic templates, summaries to excerpts, slide plans to " +
-            "rule-built equivalents — the tool keeps working, quietly. A " +
-            "number that can't be grounded in the source is discarded, never " +
-            "shown.",
-          "The same care runs through the quieter corners: an empty " +
-            "workspace gets an upload prompt instead of somebody else's demo " +
-            "data; a restored chat session renders its presentation cards " +
-            "idle rather than re-firing old generations; a document without " +
-            "a verifiable score is kept as reference context instead of " +
-            "becoming a fake report.",
-        ],
-                stack: [
+                gallery: [
           {
             src: "/uxproof-diagram-contracts.svg",
             caption:
@@ -369,6 +326,114 @@ export const caseStudies: CaseStudy[] = [
               "agent pipeline, and a local Ollama model — all inside a " +
               "single-machine boundary",
           },
+        ],
+      },
+                  {
+        heading: "Workflow",
+        lead:
+          "The information architecture follows the researcher's workflow, " +
+          "not the model's capabilities.",
+        body: [
+          "The workflow is chat-first and upload-grounded, but the " +
+            "architecture underneath it is structured around the " +
+            "researcher's mental model. Research files become evidence; " +
+            "evidence becomes reports and periods; reports become " +
+            "conversation context; conversation becomes analysis and, " +
+            "eventually, a presentation. Files go in through the chat's plus " +
+            "button; structured data — quarter, year, SUS score — is parsed " +
+            "into per-user reports, and prose documents are converted by a " +
+            "local model under a strict guardrail. From there it's plain " +
+            "language: “Analyse Q3 2025”, “Compare Q2 vs Q3”, “Generate the " +
+            "2025 presentation”.",
+          "The conversation itself is designed, not just parsed. A bare " +
+            "“yes” after the tool offers a presentation becomes a real " +
+            "generation request; a follow-up question with no period named " +
+            "inherits the last one discussed; a workspace with no data gets " +
+            "an upload prompt instead of machinery running on nothing.",
+        ],
+        image: {
+          src: "/uxproof-app-summary.jpg",
+          fit: "contain",
+          caption:
+            "[ FILE BECOMES EVIDENCE, EVIDENCE BECOMES A FILED PERIOD — " +
+            "AND EVERY FIGURE KEEPS THE PAGE IT CAME FROM ]",
+          alt:
+            "An AI summary of an uploaded research PDF in the uxproof chat: " +
+            "metrics, key findings and recommendations, each claim followed " +
+            "by the page it was read from, and a closing line saying the " +
+            "research data was extracted and filed under Q3 2026",
+        },
+      },
+            {
+        heading: "Interaction quality",
+        lead:
+          "Accessibility is part of the interaction model, not a final " +
+          "polish pass.",
+        body: [
+          "The chat surface is keyboard-operable throughout the primary " +
+            "interaction flows. Every icon-only control — upload, send, " +
+            "history, account — carries a real label; focus rings are " +
+            "visible on every interactive element; and hover-revealed " +
+            "actions, like deleting a conversation, also reveal on keyboard " +
+            "focus, so nothing in the product is pointer-only.",
+          "State changes are announced, not just painted: toasts are " +
+            "polite live regions, errors are alerts, expandable summaries " +
+            "expose their open state, and the active conversation is marked " +
+            "for assistive tech. Uploads render optimistically, generation " +
+            "cards move through honest idle / working / done / error states, " +
+            "and a restored session never silently re-fires an old " +
+            "generation.",
+          "Colour is held to the same standard, measured against the " +
+            "shipped tokens rather than assumed. Every text pair is " +
+            "calculated from the values actually shipping and listed with " +
+            "its ratio, passes and failures alike. Two colours moved " +
+            "because of it: muted text was darkened until it cleared 4.5:1 " +
+            "on every surface it lands on, and the dark-mode error pair — " +
+            "2.66:1, which made form errors nearly invisible — was " +
+            "inverted. The page names the weakest point out loud, and the " +
+            "two hues still under the bar are icon-only by rule.",
+        ],
+        image: {
+          src: "/uxproof-ds-contrast.svg",
+          caption:
+            "[ MEASURED CONTRAST — EVERY PAIR COMPUTED FROM THE SHIPPED " +
+            "TOKENS, AND THE RULES THAT FOLLOW FROM IT ]",
+          alt:
+            "Design-system page: the dark theme palette, a measured contrast " +
+            "table listing each colour pair with its ratio and whether it " +
+            "passes, and three rules derived from the measurements",
+        },
+      },
+            {
+        heading: "AI-assisted workflow",
+        lead: "AI generates quickly. I own the UX quality bar.",
+        body: [
+          "uxproof was developed with an agentic AI workflow, but the " +
+            "division of responsibility is deliberate: AI accelerates " +
+            "implementation — scaffolding components, proposing refactors, " +
+            "generating test plumbing and exploring alternatives — while I " +
+            "own the decisions that require UX and engineering judgement: " +
+            "interaction behaviour, information architecture, edge states, " +
+            "accessibility, visual quality and system consistency.",
+          "The review bar doesn't live in my head — it lives in the repo. " +
+            "A project brief encodes the invariants every generated change " +
+            "is checked against: numbers are never model-authored, every " +
+            "model step has a fallback, the deck template has one source of " +
+            "truth, and pages stay server components while interaction lives " +
+            "in client components. An auditor reviews changes against those " +
+            "invariants; tests generate versioned readiness reports; " +
+            "documentation is regenerated from the implementation so the " +
+            "system does not drift away from what was actually built.",
+          "The important shift is from reviewing AI output one change at a " +
+            "time to designing a system that constrains it. When generated " +
+            "output repeatedly introduced one-off spacing values and accent " +
+            "colours, I did not keep correcting the same problem manually. I " +
+            "encoded the rule into the project brief and branding module so " +
+            "future output — whether generated by AI or written by me — is " +
+            "evaluated against the same design constraints.",
+          "AI generates → UX engineering evaluates → the design system " +
+            "constrains → tests verify. That loop lets me move faster " +
+            "without lowering the quality bar.",
         ],
       },
       {
@@ -457,94 +522,11 @@ export const caseStudies: CaseStudy[] = [
           },
         ],
       },
-      {
-        heading: "Interaction quality",
-        lead:
-          "Accessibility is part of the interaction model, not a final " +
-          "polish pass.",
-        body: [
-          "The chat surface is keyboard-operable throughout the primary " +
-            "interaction flows. Every icon-only control — upload, send, " +
-            "history, account — carries a real label; focus rings are " +
-            "visible on every interactive element; and hover-revealed " +
-            "actions, like deleting a conversation, also reveal on keyboard " +
-            "focus, so nothing in the product is pointer-only.",
-          "State changes are announced, not just painted: toasts are " +
-            "polite live regions, errors are alerts, expandable summaries " +
-            "expose their open state, and the active conversation is marked " +
-            "for assistive tech. Uploads render optimistically, generation " +
-            "cards move through honest idle / working / done / error states, " +
-            "and a restored session never silently re-fires an old " +
-            "generation.",
-        ],
-      },
-      {
-        heading: "Colour and contrast",
-        lead: "Measured against the shipped tokens, not assumed.",
-        body: [
-          "Every text pair is calculated from the values actually shipping " +
-            "and listed with its ratio, passes and failures alike. Two " +
-            "colours moved because of it: muted text was darkened until it " +
-            "cleared 4.5:1 on every surface it lands on, and the dark-mode " +
-            "error pair — 2.66:1, which made form errors nearly invisible — " +
-            "was inverted. The page names the weakest point out loud, and " +
-            "the two hues still under the bar are icon-only by rule.",
-        ],
-        image: {
-          src: "/uxproof-ds-contrast.svg",
-          caption:
-            "[ MEASURED CONTRAST — EVERY PAIR COMPUTED FROM THE SHIPPED " +
-            "TOKENS, AND THE RULES THAT FOLLOW FROM IT ]",
-          alt:
-            "Design-system page: the dark theme palette, a measured contrast " +
-            "table listing each colour pair with its ratio and whether it " +
-            "passes, and three rules derived from the measurements",
-        },
-      },
-      {
-        heading: "Responsive behaviour",
-        lead: "Responsive work is a series of decisions about what to lose.",
-        body: [
-          "The file row is the clearest one. It reads left to right as " +
-            "identity, facts, evidence, actions, disclosure — and below the " +
-            "sm breakpoint the period badges are what goes. They are the " +
-            "row's evidence of what that file actually contributed, which " +
-            "matters, but the filename and the two actions are what the row " +
-            "is *for*. Nothing wraps to a second line; the row keeps its " +
-            "shape and loses a column.",
-          "The presentation card goes the other way deliberately. Its " +
-            "slide strip stays four across at every width instead of " +
-            "reflowing to two, and the thumbnails shrink instead. The strip " +
-            "is a proportional map of the deck — how many slides, which ones " +
-            "carry the violet — so reflowing it would change what it " +
-            "communicates rather than just how it fits.",
-          "The conversation is capped rather than restructured: the " +
-            "message column stops at 48rem and centres, and no bubble " +
-            "exceeds 85% of it, so line length stays readable on a wide " +
-            "monitor and the same rule simply fills a tablet. The history " +
-            "drawer is an overlay with a scrim at every width, never a " +
-            "persistent column, so opening it never reflows the conversation " +
-            "behind it. The presentations grid is the one place that " +
-            "genuinely re-columns — one up, two at md, three at lg — because " +
-            "cards are the only content here that tolerates it.",
-        ],
-        image: {
-          src: "/uxproof-app-strip.jpg", // CHANGE THIS IMAGE INTO RELEVANT ONE
-          fit: "contain",
-          caption:
-            "[ THE SLIDE STRIP STAYS FOUR ACROSS — THE THUMBNAILS SHRINK, " +
-            "THE SHAPE OF THE DECK SURVIVES ]",
-          alt:
-            "The uxproof chat at tablet width: a finished presentation card " +
-            "whose slide strip keeps four thumbnails per row, with the " +
-            "violet cover and findings-summary slides visible among the " +
-            "greyed ones",
-        },
-      },
+
       {
         heading: "The deck's design system",
         lead:
-          "The slides's design system is separate from the application's, and " +
+          "The slides' design system is separate from the application's, and " +
           "stricter.",
         body: [
           "The deck is built on four masters — content, cover, section " +
@@ -568,21 +550,56 @@ export const caseStudies: CaseStudy[] = [
             "code, where a slide is emitted only when the figures behind it " +
             "exist.",
         ],
-        stack: [
+        gallery: [
+          {
+            src: "/uxproof-deckspec-palette.svg",
+            caption:
+              "[ THE PALETTE — FIVE COLOURS, FOUR FLAT INK TINTS, AND THE " +
+              "JOB EACH ONE IS ALLOWED TO DO ]",
+            alt:
+              "A page from the deck build spec: a palette table listing " +
+              "ground, ink, the three violets and the four ink tints, each " +
+              "with its swatch, hex, RGB values and the elements it is used " +
+              "for, and a closing note on text colours over violet fields",
+          },
+          {
+            src: "/uxproof-deckspec-typescale.svg",
+            caption:
+              "[ THE TYPE SCALE — THIRTEEN ROLES, EACH WITH ITS SIZE, " +
+              "WEIGHT, TRACKING AND LEADING ]",
+            alt:
+              "A page from the deck build spec: a type scale table running " +
+              "from the 68 pt cover name and the 150 pt divider numeral " +
+              "down to the 12 pt eyebrow, each role given an exact size, " +
+              "weight, letter spacing and line spacing",
+          },
           {
             src: "/uxproof-deckspec-masters.svg",
             caption:
-              "[ FOUR MASTERS — CONTENT, COVER, SECTION DIVIDER, AND THE ONE " +
-              "VIOLET STATEMENT POSTER ]",
+              "[ TWO OF THE FOUR MASTERS — THE CONTENT SLIDE AND THE COVER, " +
+              "POSITIONED IN INCHES ]",
             alt:
-              "A page from the deck build spec showing the four slide " +
-              "masters drawn to scale: the content master with its eyebrow " +
-              "row and data field, the cover with its violet plate over a " +
-              "full-bleed photograph, the section divider with its ghost " +
-              "numeral, and the violet statement poster",
+              "A page from the deck build spec showing two slide masters " +
+              "drawn to scale: the content master with its eyebrow row, " +
+              "rule, title, standfirst and dashed data field, and the cover " +
+              "with a violet plate over a full-bleed greyscale photograph, " +
+              "each annotated with the inch positions it is built from",
           },
-           {
-          src: "/uxproof-app-strip.jpg", // CHANGE THIS IMAGE INTO RELEVANT ONE
+          {
+            src: "/uxproof-deckspec-masters-cont.svg",
+            caption:
+              "[ THE OTHER TWO — THE SECTION DIVIDER AND THE ONE VIOLET " +
+              "STATEMENT POSTER ]",
+            alt:
+              "A page from the deck build spec showing the remaining two " +
+              "masters: the section divider with its ghost numeral and a " +
+              "greyscale photograph panel down the right edge, and the " +
+              "violet statement slide with one hero figure beside a ruled " +
+              "list of four findings",
+          },
+        ],
+        image: {
+          src: "/uxproof-deck-system.jpg", // CHANGE THIS IMAGE INTO RELEVANT ONE
           fit: "contain",
           caption:
             "[ THE SLIDE STRIP STAYS FOUR ACROSS — THE THUMBNAILS SHRINK, " +
@@ -593,40 +610,6 @@ export const caseStudies: CaseStudy[] = [
             "violet cover and findings-summary slides visible among the " +
             "greyed ones",
         },
-
-        ],
-      },
-      {
-        heading: "AI-assisted workflow",
-        lead: "AI generates quickly. I own the UX quality bar.",
-        body: [
-          "uxproof was developed with an agentic AI workflow, but the " +
-            "division of responsibility is deliberate: AI accelerates " +
-            "implementation — scaffolding components, proposing refactors, " +
-            "generating test plumbing and exploring alternatives — while I " +
-            "own the decisions that require UX and engineering judgement: " +
-            "interaction behaviour, information architecture, edge states, " +
-            "accessibility, visual quality and system consistency.",
-          "The review bar doesn't live in my head — it lives in the repo. " +
-            "A project brief encodes the invariants every generated change " +
-            "is checked against: numbers are never model-authored, every " +
-            "model step has a fallback, the deck template has one source of " +
-            "truth, and pages stay server components while interaction lives " +
-            "in client components. An auditor reviews changes against those " +
-            "invariants; tests generate versioned readiness reports; " +
-            "documentation is regenerated from the implementation so the " +
-            "system does not drift away from what was actually built.",
-          "The important shift is from reviewing AI output one change at a " +
-            "time to designing a system that constrains it. When generated " +
-            "output repeatedly introduced one-off spacing values and accent " +
-            "colours, I did not keep correcting the same problem manually. I " +
-            "encoded the rule into the project brief and branding module so " +
-            "future output — whether generated by AI or written by me — is " +
-            "evaluated against the same design constraints.",
-          "AI generates → UX engineering evaluates → the design system " +
-            "constrains → tests verify. That loop lets me move faster " +
-            "without lowering the quality bar.",
-        ],
       },
       {
         heading: "Outcome",
@@ -641,24 +624,29 @@ export const caseStudies: CaseStudy[] = [
             "unavailable. The prototype connects product thinking, UX " +
             "research practice, interaction design, React engineering and " +
             "AI-assisted implementation in one system.",
+          "Its quality lives in decisions a screenshot doesn't show. " +
+            "Responsive work, for one, is a series of decisions about what " +
+            "to lose.",
           "I have not measured adoption, usage or time saved, so I don't " +
             "present invented outcome metrics. What I can demonstrate is the " +
             "complete experience — from interaction model and design system " +
             "through React implementation, AI behaviour, validation and " +
             "presentation output.",
         ],
-        image: {
-          src: "/uxproof-app-summary.jpg",
-          fit: "contain",
-          caption:
-            "[ THE DECK, READY TO DOWNLOAD — THE STRIP SHOWS WHAT THIS " +
-            "DATA ACTUALLY PRODUCED ]",
-          alt:
-            "The uxproof chat on a tablet with a finished presentation card: " +
-            "a strip of slide thumbnails labelled cover, contents, executive " +
-            "summary, study at a glance, section, finding, findings summary " +
-            "and recommendations, above a download button",
-        },
+        stack: [
+          {
+            src: "/uxproof-app-strip.jpg", // CHANGE THIS IMAGE INTO RELEVANT ONE
+            fit: "contain",
+            caption:
+              "[ THE SLIDE STRIP STAYS FOUR ACROSS — THE THUMBNAILS SHRINK, " +
+              "THE SHAPE OF THE DECK SURVIVES ]",
+            alt:
+              "The uxproof chat at tablet width: a finished presentation " +
+              "card whose slide strip keeps four thumbnails per row, with " +
+              "the violet cover and findings-summary slides visible among " +
+              "the greyed ones",
+          },
+        ],
       },
       {
         heading: "What I'd tell the next team",

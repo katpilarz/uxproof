@@ -142,7 +142,7 @@ export function FilesView() {
       className="h-full w-full overflow-y-auto"
     >
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="flex items-start justify-between mb-8 gap-4">
+        <div className="flex flex-wrap items-start justify-between mb-8 gap-4">
           <div>
             <h1 className="mb-2 display text-3xl">Your Files</h1>
             <p className="text-muted-foreground">
@@ -185,83 +185,98 @@ export function FilesView() {
 
             return (
               <Card key={file._id} className="border border-border bg-card overflow-hidden p-0">
-                <div className="flex items-center gap-3 p-4">
-                  <div className="size-10 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 grid place-items-center shrink-0">
-                    <FileText className="size-5" />
-                  </div>
+                {/* One row from md up; below that the identity block takes the
+                    full width and the controls drop onto their own line, so
+                    the filename and its metadata never collide with a button. */}
+                <div className="flex flex-wrap items-center gap-3 p-4">
+                  <div className="flex items-center gap-3 min-w-0 basis-full md:basis-0 md:flex-1">
+                    <div className="size-10 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 grid place-items-center shrink-0">
+                      <FileText className="size-5" />
+                    </div>
 
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{file.filename}</p>
-                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                      <span className="font-mono">{extOf(file.filename)}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{formatSize(file.size)}</span>
-                      {file.uploadedAt && (
-                        <>
-                          <span aria-hidden="true">·</span>
-                          <span>{formatDistanceToNowStrict(new Date(file.uploadedAt), { addSuffix: true })}</span>
-                        </>
-                      )}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{file.filename}</p>
+                      <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground mt-0.5">
+                        <span className="font-mono">{extOf(file.filename)}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{formatSize(file.size)}</span>
+                        {file.uploadedAt && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span>{formatDistanceToNowStrict(new Date(file.uploadedAt), { addSuffix: true })}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Extracted periods */}
                   {hasData && (
-                    <div className="hidden sm:flex items-center gap-1 shrink-0">
+                    <div className="hidden lg:flex items-center gap-1 shrink-0">
                       {file.reportsCreated!.map(p => (
                         <Badge key={p} variant="secondary" className="font-mono text-[10px]">{p}</Badge>
                       ))}
                     </div>
                   )}
 
-                  {/* Active prompts — both open a fresh chat that runs the request */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      variant="outline" size="sm"
-                      onClick={() => runPrompt(`Summarize the file "${file.filename}"`)}
-                      title="Run a fresh summary in a new chat"
-                      className="gap-1.5 text-xs"
-                    >
-                      <Sparkles className="size-3.5 text-violet-600 dark:text-violet-400" />
-                      Summarize
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => latest && runPrompt(`Generate ${latest} presentation`)}
-                      disabled={!hasData}
-                      title={hasData
-                        ? `Generate the ${latest} deck in a new chat`
-                        : 'No research data was extracted from this file'}
-                      className="gap-1.5 text-xs"
-                    >
-                      <Layers className="size-3.5" />
-                      Generate presentation
-                    </Button>
+                  {/* Prompts on the left, icon actions on the right. Below md
+                      this cluster takes its own full-width line and the two
+                      groups justify apart; from md up it sits at the end of
+                      the single row. */}
+                  <div className="flex w-full items-center justify-between gap-2 md:w-auto md:shrink-0 md:justify-start">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => runPrompt(`Summarize the file "${file.filename}"`)}
+                        title="Run a fresh summary in a new chat"
+                        className="gap-1.5 text-xs"
+                      >
+                        <Sparkles className="size-3.5 text-violet-600 dark:text-violet-400" />
+                        Summarize
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => latest && runPrompt(`Generate ${latest} presentation`)}
+                        disabled={!hasData}
+                        title={hasData
+                          ? `Generate the ${latest} deck in a new chat`
+                          : 'No research data was extracted from this file'}
+                        className="gap-1.5 text-xs"
+                      >
+                        <Layers className="size-3.5" />
+                        {/* The long label is the clearer one — it only shortens
+                            where it would otherwise force a second wrap. */}
+                        <span className="sm:hidden">Generate</span>
+                        <span className="hidden sm:inline">Generate presentation</span>
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Delete — removes the file and any research periods
+                          it alone supplied. Confirmed first. */}
+                      <Button
+                        variant="ghost" size="icon"
+                        onClick={() => setPendingDelete(file)}
+                        aria-label={`Delete ${file.filename}`}
+                        title="Delete file"
+                        className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+
+                      {/* Accordion control — very right of the header */}
+                      <Button
+                        variant="ghost" size="icon"
+                        onClick={() => toggleSummary(file._id)}
+                        aria-expanded={isOpen}
+                        aria-label={isOpen ? 'Hide document summary' : 'Show document summary'}
+                        title={isOpen ? 'Hide summary' : 'Show summary'}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <ChevronDown className={cn('size-4 transition-transform duration-200', isOpen && 'rotate-180')} />
+                      </Button>
+                    </div>
                   </div>
-
-                  {/* Delete — removes the file and any research periods
-                      it alone supplied. Confirmed first. */}
-                  <Button
-                    variant="ghost" size="icon"
-                    onClick={() => setPendingDelete(file)}
-                    aria-label={`Delete ${file.filename}`}
-                    title="Delete file"
-                    className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-
-                  {/* Accordion control — very right of the header */}
-                  <Button
-                    variant="ghost" size="icon"
-                    onClick={() => toggleSummary(file._id)}
-                    aria-expanded={isOpen}
-                    aria-label={isOpen ? 'Hide document summary' : 'Show document summary'}
-                    title={isOpen ? 'Hide summary' : 'Show summary'}
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                  >
-                    <ChevronDown className={cn('size-4 transition-transform duration-200', isOpen && 'rotate-180')} />
-                  </Button>
                 </div>
 
                 {isOpen && (

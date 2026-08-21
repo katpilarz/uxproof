@@ -11,7 +11,9 @@
  * TopBar reads usePathname() and uses router.push() to navigate.
  *
  * Logo click → resets to a fresh chat on the welcome screen.
- * Sidebar icon (left of the logo) → opens the chat history sidebar.
+ * Sidebar icon (left of the logo) → toggles the chat history sidebar, which
+ * is non-modal: it pushes the content aside rather than covering it, and
+ * nothing behind it is dimmed or blurred.
  * Settings lives in the chat input, not the top bar.
  */
 
@@ -104,7 +106,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex-1 flex overflow-hidden pt-14 relative">
           <ChatHistorySidebar />
-          <div className="flex-1 min-w-0">
+          {/* The sidebar is non-modal: nothing is dimmed and the chat stays
+              usable while it is open, so the content is pushed aside (in step
+              with the panel's own 300ms slide) instead of covered. Below sm
+              the panel is a full-width drawer, so there is nothing to push. */}
+          <div
+            className={`flex-1 min-w-0 transition-[margin-left] duration-300 ease-in-out ${
+              historyOpen ? 'sm:ml-72' : 'ml-0'
+            }`}
+          >
             {children}
           </div>
         </div>
