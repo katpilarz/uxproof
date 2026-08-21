@@ -82,12 +82,12 @@ function buildCasualResponse(query: string): string {
   if (/^(hi|hello|hey)\b/.test(q) || /^good (morning|afternoon|evening)/.test(q))
     return `Hello! I'm the **uxproof research assistant**.\n\nEverything I answer comes from the research files **you upload** — add one with the **+** button any time.\n\nI can help you with:\n\n• **See what you have** — _"Summarize my files"_\n• **Analyse a period** — _"Analyse my latest quarter"_ or name one, _"Analyse Q3 2026"_\n• **Compare periods** — _"Compare Q3 2026 vs Q4 2026"_\n• **Full year overviews** — _"Full year 2026 overview"_\n• **Generate presentations** — _"Generate a presentation"_ for your latest period\n\nWhat would you like to explore?`;
   if (/how (can|do) you help/.test(q) || /what can you do/.test(q) || /^help\b/.test(q))
-    return `I'm the **uxproof research assistant** — I turn **the research files you upload** into client-ready insights and presentations. I only ever work from your own data.\n\n**I can:**\n\n• Summarize the documents you've uploaded\n• Query SUS, task success, NPS, error-rate and conversion data from your periods\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• _"Summarize my files"_\n• _"Analyse my latest quarter"_\n• _"Generate a presentation"_`;
+    return `I'm the **uxproof research assistant** — I turn **the research files you upload** into client-ready insights and presentations. I only ever work from your own data.\n\n**I can:**\n\n• Summarize the documents you've uploaded\n• Query SUS, task success, NPS, error-rate and conversion data from your periods\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate client-ready .pptx research decks\n\n**Try:**\n\n• _"Summarize my files"_\n• _"Analyse my latest quarter"_\n• _"Generate a presentation"_`;
   if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Summarize my files"_ or _"Generate a presentation"_`;
   if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse my latest quarter"_`;
   if (/^(thanks|thank you)/.test(q)) return `You're welcome! Let me know if you need any other analysis or a presentation.`;
   if (/^(can you|are you able to|do you)\b/.test(q))
-    return `Yes — I can generate presentations for either scope:\n\n• **Single quarter** — _"Generate Q2 2026 presentation"_ → 8-slide deck focused on that quarter's research\n• **Full year** — _"Generate 2026 presentation"_ → 8-slide deck aggregating every quarter you have for that year\n\nEvery deck is the same fixed 8 slides, built from your uploaded data. Say _"Generate a presentation"_ and I'll use your latest period. What would you like?`;
+    return `Yes — I can generate presentations for either scope:\n\n• **Single quarter** — _"Generate Q2 2026 presentation"_ → a deck focused on that quarter's research\n• **Full year** — _"Generate 2026 presentation"_ → a deck aggregating every quarter you have for that year\n\nEvery deck follows the same structure and styling, built from your uploaded data — its length follows what that data supports. Say _"Generate a presentation"_ and I'll use your latest period. What would you like?`;
   return `I can help you analyse the research you've uploaded and generate presentations. Try: _"Summarize my files"_`;
 }
 
@@ -416,16 +416,16 @@ function buildPresentationPreview(ctx: ReportContext, scope: PresentationScope):
     const label = displayPeriod(ctx.period);
 
     if (!agg || qCount === 0) {
-      return `**Generating ${label} presentation**\n\n8-slide research deck — building from full-year data. Generation is starting below; the download button appears when it’s ready.`;
+      return `**Generating ${label} presentation**\n\nResearch deck — building from full-year data. Its length follows what the data supports. Generation is starting below; the download button appears when it’s ready.`;
     }
 
-    return `**Generating ${label} full-year presentation**\n\nAggregating **${qCount} quarter${qCount === 1 ? '' : 's'}**: avg SUS **${agg.avgSusScore}**, avg task success **${agg.avgTaskSuccessRate}%**, **${agg.totalParticipants.toLocaleString()}** research participants.\n\n8-slide research deck — generating now, the download button appears below when it’s ready.`;
+    return `**Generating ${label} full-year presentation**\n\nAggregating **${qCount} quarter${qCount === 1 ? '' : 's'}**: avg SUS **${agg.avgSusScore}**, avg task success **${agg.avgTaskSuccessRate}%**, **${agg.totalParticipants.toLocaleString()}** research participants.\n\nResearch deck — generating now, the download button appears below when it’s ready.`;
   }
 
   // Quarter scope
   const r = ctx.primary;
   if (!r) {
-    return `**Generating ${displayPeriod(ctx.period)} presentation**\n\n8-slide research deck — generating now, the download button appears below when it’s ready.`;
+    return `**Generating ${displayPeriod(ctx.period)} presentation**\n\nResearch deck — generating now, the download button appears below when it’s ready.`;
   }
   const susNote = ctx.delta
     ? `, ${pts(ctx.delta.susScore)} vs ${ctx.comparisonPeriod}`
@@ -441,7 +441,7 @@ function buildPresentationPreview(ctx: ReportContext, scope: PresentationScope):
     r.taskSuccessRate != null ? `task success **${r.taskSuccessRate}%**` : '',
     r.npsScore        != null ? `NPS **${sign(r.npsScore)}${r.npsScore}**` : '',
   ].filter(Boolean).join(', ');
-  return `**Generating ${displayPeriod(ctx.period)} presentation**\n\n${bits}.\n\n8-slide research deck — generating now, the download button appears below when it’s ready.`;
+  return `**Generating ${displayPeriod(ctx.period)} presentation**\n\n${bits}.\n\nResearch deck — generating now, the download button appears below when it’s ready.`;
 }
 
 function buildResponse(
