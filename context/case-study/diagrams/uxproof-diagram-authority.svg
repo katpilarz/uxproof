@@ -52,7 +52,7 @@
   <rect x="758" y="196" width="6" height="6" fill="#1A1A1A"/>
   <text x="778" y="204" font-size="11.5" fill="#1A1A1A">every number — read from the store</text>
   <rect x="758" y="240" width="6" height="6" fill="#1A1A1A"/>
-  <text x="778" y="248" font-size="11.5" fill="#1A1A1A">the fixed eight-slide structure</text>
+  <text x="778" y="248" font-size="11.5" fill="#1A1A1A">the deck&#8217;s structure and length</text>
   <rect x="758" y="284" width="6" height="6" fill="#1A1A1A"/>
   <text x="778" y="292" font-size="11.5" fill="#1A1A1A">styling — one branding module</text>
   <rect x="758" y="328" width="6" height="6" fill="#1A1A1A"/>

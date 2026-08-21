@@ -41,8 +41,8 @@
 
   <rect x="756" y="288" width="272" height="96" fill="#FBFBF9" stroke="#D9D9D3" stroke-width="1"/>
   <text x="892" y="318" font-size="10.5" letter-spacing="1" fill="#1A1A1A" text-anchor="middle">DECK RENDERER</text>
-  <text x="892" y="340" font-size="9.5" fill="#6B6B66" text-anchor="middle">fixed 8 slides ·</text>
-  <text x="892" y="356" font-size="9.5" fill="#6B6B66" text-anchor="middle">one monochrome brand module</text>
+  <text x="892" y="340" font-size="9.5" fill="#6B6B66" text-anchor="middle">13 slide types · length follows the data ·</text>
+  <text x="892" y="356" font-size="9.5" fill="#6B6B66" text-anchor="middle">one brand module</text>
 
   <!-- next -> sanity -->
   <line x1="265" y1="408" x2="265" y2="486" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>

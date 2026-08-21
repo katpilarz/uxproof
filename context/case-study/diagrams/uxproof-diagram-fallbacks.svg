@@ -58,7 +58,7 @@
   <text x="190" y="588" font-size="9" fill="#6B6B66" text-anchor="middle">selects + narrates the content</text>
   <line x1="340" y1="572" x2="380" y2="572" stroke="#1A1A1A" stroke-width="1" marker-end="url(#arw)"/>
   <rect x="388" y="534" width="284" height="76" fill="#F3F3EF" stroke="#1A1A1A" stroke-width="1"/>
-  <text x="530" y="566" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">RULE-BUILT 8-SLIDE PLAN</text>
+  <text x="530" y="566" font-size="10.5" letter-spacing="0.5" fill="#1A1A1A" text-anchor="middle">RULE-BUILT SLIDE PLAN</text>
   <text x="530" y="588" font-size="9" fill="#6B6B66" text-anchor="middle">a complete deck, no model required</text>
 
   <!-- footer -->
