@@ -32,7 +32,7 @@ const VARIANT_ICON = {
 
 const VARIANT_ICON_CLASS = {
   success: 'text-emerald-500',
-  error:   'text-red-500',
+  error:   'text-destructive',
   info:    'text-violet-500',
 } as const;
 

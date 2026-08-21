@@ -241,7 +241,7 @@ function ProfileForms({ user }: { user: AuthUser }) {
               <Button
                 type="button" variant="outline" size="sm"
                 onClick={removePhoto}
-                className="gap-1.5 text-muted-foreground hover:text-red-600 hover:border-red-300 dark:hover:text-red-400"
+                className="gap-1.5 text-muted-foreground hover:text-destructive hover:border-destructive/30"
               >
                 <X className="size-3.5" />
                 Remove

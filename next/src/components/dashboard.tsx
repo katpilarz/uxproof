@@ -47,6 +47,12 @@ interface PresentationRow {
   generatedDate?: string;
 }
 
+// SCOPED EXCEPTION to "violet is the only chroma" (see CLAUDE.md).
+// These hues are a decorative cover for a generated artefact: hashed from the
+// document id so each deck keeps a stable, recognisable face in a grid of
+// otherwise identical cards. The hue carries NO meaning — it is not status,
+// not category, not data. Do not let this palette spread to chrome, status,
+// type or anything a user has to interpret.
 const GRADIENTS = [
   'from-purple-600 to-blue-500',
   'from-orange-400 to-pink-400',
@@ -218,7 +224,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
                       onClick={() => setPendingDelete(presentation)}
                       aria-label={`Delete presentation ${presentation.title || presentation.quarter || ''}`.trim()}
                       title="Delete presentation"
-                      className="text-red-600 hover:text-red-600 hover:bg-red-500/10"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="size-4" />
                     </Button>

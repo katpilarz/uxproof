@@ -1,0 +1,593 @@
+{
+ "$meta": {
+  "name": "uxproof application design system",
+  "version": "1.1.0",
+  "issued": "2026-08-20",
+  "scope": "The Next.js web application in next/. The generated PowerPoint deck is a SEPARATE system defined in next/src/lib/branding/brand.ts — its tokens must never be used here, and these must never be used there.",
+  "derivedFrom": [
+   "next/src/app/globals.css",
+   "next/src/app/layout.tsx",
+   "next/src/components/ui/*",
+   "next/src/components/*"
+  ],
+  "notes": "Values marked with a `source` are the shipping implementation. Semantic names in this file are a naming layer over that implementation, not a replacement for it — address colour in code through the Tailwind token utilities (bg-card, text-muted-foreground), never by hex.",
+  "changelog": {
+   "1.1.0": "Findings from v1.0 applied to the code. --muted-foreground darkened to clear 4.5:1 on card; the dark --destructive pair inverted and every raw red-*/rose-* utility migrated onto it; eleven unused tokens, three dead components and four unused primitives deleted (recharts dropped with the chart primitive); the default Button variant given a real hover. See color.destructive, accessibility.contrast and resolved.",
+   "1.0.0": "First capture of the shipped system."
+  }
+ },
+ "color": {
+  "background": {
+   "default": {
+    "light": "#ffffff",
+    "dark": "#13131f",
+    "source": "--background",
+    "usage": "The page ground."
+   },
+   "sunken": {
+    "light": "#f7f5ff",
+    "dark": "#0f0f1c",
+    "source": "--sidebar (declared) / literal #0f0f1c",
+    "usage": "Darkest ground. Used literally on the dashboard 'generate new' tile; the --sidebar token itself is unused."
+   }
+  },
+  "surface": {
+   "default": {
+    "light": "#f8f7fc",
+    "dark": "#171726",
+    "source": "--card, --popover",
+    "usage": "Cards, dialogs, dropdowns, popovers, the login form."
+   },
+   "sunken": {
+    "light": "#eeecf8",
+    "dark": "#21213a",
+    "source": "--muted",
+    "usage": "Recessed fills: ghost-button hover, avatar fallback, code, table head. Usually applied at 30–60% alpha."
+   },
+   "accent": {
+    "light": "#ede9fc",
+    "dark": "#23233d",
+    "source": "--accent",
+    "usage": "Reserved tint one step warmer than surface.sunken. Rarely used."
+   },
+   "userBubble": {
+    "light": "rgba(35,35,61,0.9)",
+    "dark": "#fafafa",
+    "source": "literal in chat-interface.tsx",
+    "usage": "The user's own chat bubble — the only hard-coded surface in the app."
+   }
+  },
+  "text": {
+   "primary": {
+    "light": "#09090b",
+    "dark": "#eeeef5",
+    "source": "--foreground"
+   },
+   "secondary": {
+    "light": "#696979",
+    "dark": "#9090b0",
+    "source": "--muted-foreground",
+    "usage": "Subtitles, metadata, timestamps, placeholders, inactive icons.",
+    "note": "Darkened from #717182 in v1.1: the old value scored 4.49:1 against `card`, which is where most of it lands. This is the contrast floor of the palette — never lighten it, and never put it on `surface.sunken`."
+   },
+   "onSecondaryFill": {
+    "light": "#030213",
+    "dark": "#eeeef5",
+    "source": "--secondary-foreground"
+   },
+   "inverse": {
+    "light": "#ffffff",
+    "dark": "#13131f",
+    "source": "--background inverted",
+    "usage": "Tooltip text on the inverted tooltip ground."
+   }
+  },
+  "border": {
+   "default": {
+    "light": "rgba(91,71,214,0.10)",
+    "dark": "rgba(120,100,220,0.13)",
+    "source": "--border",
+    "usage": "Every hairline. Violet-tinted, never neutral grey."
+   },
+   "ring": {
+    "light": "rgba(9,9,11,0.10)",
+    "dark": "rgba(238,238,245,0.10)",
+    "source": "ring-1 ring-foreground/10",
+    "usage": "Card and DialogContent outline — a ring rather than a border."
+   },
+   "selected": {
+    "light": "rgba(139,92,246,0.40)",
+    "dark": "rgba(139,92,246,0.40)",
+    "source": "border-violet-500/40"
+   }
+  },
+  "action": {
+   "primary": {
+    "light": "#5B47D6",
+    "dark": "#7060e0",
+    "source": "--primary, --ring",
+    "usage": "The one filled action per view, the active nav item, the focus ring, progress fill."
+   },
+   "primaryText": {
+    "light": "#ffffff",
+    "dark": "#ffffff",
+    "source": "--primary-foreground"
+   },
+   "secondary": {
+    "light": "#f0effe",
+    "dark": "#21213a",
+    "source": "--secondary",
+    "usage": "Low-emphasis filled control and the neutral badge."
+   }
+  },
+  "accent": {
+   "ink": {
+    "light": "#7c3aed",
+    "dark": "#a78bfa",
+    "source": "violet-600 / violet-400",
+    "usage": "Accent ink: the 'ux' in the wordmark, inline action icons, citation chips."
+   },
+   "wash": {
+    "light": "rgba(139,92,246,0.10)",
+    "dark": "rgba(139,92,246,0.10)",
+    "source": "bg-violet-500/10",
+    "usage": "Selected rows, icon tiles, citation chips."
+   },
+   "logomark": {
+    "value": "#7E27FE",
+    "source": "top-bar.tsx UxproofMark, app/icon.svg, lib/ppt-generator.ts cover mark",
+    "usage": "The app tile and favicon — the identity's own flat violet, not a UI token. Was a 135° gradient (#8B75FF → #5B47D6) until the mark was redrawn; keep the component, the favicon and the deck cover mark in sync."
+   },
+   "assistantGradient": {
+    "value": "linear-gradient(135deg, #8b5cf6, #9333ea)",
+    "source": "chat-interface.tsx",
+    "usage": "The assistant avatar tile — marks generated content, and nothing else."
+   }
+  },
+  "focus": {
+   "ring": {
+    "light": "rgba(91,71,214,0.50)",
+    "dark": "rgba(112,96,224,0.50)",
+    "source": "ring-ring/50"
+   },
+   "width": {
+    "value": "3px",
+    "source": "ring-3"
+   }
+  },
+  "status": {
+   "success": {
+    "light": "#059669",
+    "dark": "#34d399",
+    "source": "emerald-600 / emerald-400",
+    "usage": "Completed steps, success toasts, the Ready badge. ICON-ONLY in light mode — 3.77:1 on white, which clears the 3:1 graphics threshold but not the 4.5:1 text threshold."
+   },
+   "progress": {
+    "light": "#8b5cf6",
+    "dark": "#a78bfa",
+    "source": "violet-500 / violet-400",
+    "usage": "Running steps, streaming caret, generating spinner."
+   },
+   "error": {
+    "light": "#d4183d",
+    "dark": "#f87171",
+    "source": "--destructive",
+    "usage": "The single danger colour: validation, failed steps, error toasts, error bubbles, delete affordances and the confirm button. Ink and solid fill alike; washes are destructive/5-/20.",
+    "note": "Deliberately inverted between themes — dark mode needs danger to read as INK on #13131f, so the dark value is the light red and `destructive-foreground` is the dark ink that sits on it."
+   },
+   "advisory": {
+    "light": "#d97706",
+    "dark": "#fbbf24",
+    "source": "amber-600 / amber-400",
+    "usage": "Quick-action insight icons. ICON-ONLY in light mode — 3.19:1 on white."
+   },
+   "onError": {
+    "light": "#ffffff",
+    "dark": "#13131f",
+    "source": "--destructive-foreground",
+    "usage": "Text on a solid destructive fill — the ConfirmDialog confirm button."
+   }
+  }
+ },
+ "typography": {
+  "family": {
+   "sans": {
+    "value": "var(--font-schibsted), 'Schibsted Grotesk', 'Helvetica Neue', sans-serif",
+    "source": "--font-sans / --font-heading"
+   },
+   "mono": {
+    "value": "var(--font-plex-mono), 'IBM Plex Mono', monospace",
+    "source": "--font-mono",
+    "usage": "Machine facts and chrome only: extensions, period tags, durations, citation chips, uppercase group labels. Never prose."
+   }
+  },
+  "weight": {
+   "regular": 400,
+   "medium": 500,
+   "semibold": 600,
+   "note": "600 is the ceiling in practice — font-bold appears nowhere in the app."
+  },
+  "role": {
+   "display": {
+    "size": "30px",
+    "weight": 600,
+    "tracking": "-0.04em",
+    "leading": 1.05,
+    "source": ".display + text-3xl",
+    "usage": "One page headline per view."
+   },
+   "dialogTitle": {
+    "size": "24px",
+    "weight": 500,
+    "tracking": "-0.02em",
+    "source": "DialogTitle + text-2xl"
+   },
+   "cardTitle": {
+    "size": "16px",
+    "weight": 500,
+    "leading": 1.375,
+    "source": "CardTitle"
+   },
+   "body": {
+    "size": "14px",
+    "weight": 400,
+    "leading": 1.625,
+    "source": "text-sm leading-relaxed"
+   },
+   "label": {
+    "size": "14px",
+    "weight": 500,
+    "leading": 1,
+    "source": "Label"
+   },
+   "meta": {
+    "size": "12px",
+    "weight": 400,
+    "leading": 1.5,
+    "source": "text-xs text-muted-foreground"
+   },
+   "micro": {
+    "size": "11px",
+    "weight": 400,
+    "source": "text-[11px]",
+    "usage": "Context tags, sidebar metadata, citation chips."
+   },
+   "chromeLabel": {
+    "size": "10px",
+    "weight": 400,
+    "tracking": "0.15em",
+    "transform": "uppercase",
+    "family": "mono",
+    "source": "font-mono text-[10px] uppercase tracking-[0.15em]"
+   }
+  }
+ },
+ "spacing": {
+  "base": "4px",
+  "xs": "4px",
+  "sm": "8px",
+  "md": "12px",
+  "lg": "16px",
+  "xl": "20px",
+  "2xl": "24px",
+  "3xl": "32px",
+  "assignment": {
+   "containerPadding": "16px — anything with a border around it (card, dialog, top-bar gutter, message-row gap)",
+   "controlPadding": "10px horizontal inside buttons, inputs and select triggers",
+   "labelToField": "6px",
+   "fieldToField": "20px",
+   "pageGutter": "24px",
+   "siblingGap": "24px — between message rows and deck cards",
+   "sectionGap": "32px"
+  }
+ },
+ "radius": {
+  "base": "0.625rem",
+  "xs": {
+   "value": "2px",
+   "source": "rounded-xs (Tailwind default)",
+   "usage": "The clipped tail corner of a chat bubble — nothing else."
+  },
+  "sm": {
+   "value": "6px",
+   "source": "--radius-sm",
+   "usage": "Inline code, tooltip, small inline chips."
+  },
+  "md": {
+   "value": "8px",
+   "source": "--radius-md",
+   "usage": "Dropdown items, icon tiles, pipeline rows, mode-switch tabs."
+  },
+  "lg": {
+   "value": "10px",
+   "source": "--radius-lg",
+   "usage": "Controls: buttons, inputs, textarea, select trigger, popover surfaces, session rows."
+  },
+  "xl": {
+   "value": "14px",
+   "source": "--radius-xl",
+   "usage": "Containers: cards, dialogs, panels, chat bubbles, toasts."
+  },
+  "2xl": {
+   "value": "16px",
+   "source": "rounded-2xl (Tailwind default)",
+   "usage": "The login card only."
+  },
+  "full": {
+   "value": "9999px",
+   "usage": "Badges, avatars, the composer pill, the send button, status dots."
+  }
+ },
+ "border": {
+  "width": {
+   "hairline": "1px",
+   "note": "The only border width in the application."
+  },
+  "style": {
+   "default": "solid",
+   "awaitingInput": "dashed — the avatar drop target only"
+  }
+ },
+ "shadow": {
+  "none": {
+   "value": "none",
+   "usage": "In-page cards, file rows, message bubbles — flat by default."
+  },
+  "sm": {
+   "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+   "usage": "Stat cards, login card, selected mode-switch tab."
+  },
+  "md": {
+   "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+   "usage": "Dropdown and select surfaces."
+  },
+  "lg": {
+   "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+   "usage": "Toasts; deck card on hover."
+  },
+  "drawer": {
+   "value": "4px 0 24px -4px rgba(0,0,0,0.12)",
+   "usage": "The history drawer, cast rightward onto the page."
+  },
+  "scrim": {
+   "dialog": "bg-black/10 + backdrop-blur-xs",
+   "drawer": "bg-black/20 (dark: /40) + backdrop-blur-[1px]"
+  },
+  "rule": "Never combine a shadow with a visible border on something that sits in the page flow."
+ },
+ "layout": {
+  "topbar": {
+   "height": "56px",
+   "z": 50,
+   "position": "fixed",
+   "contentOffset": "pt-14"
+  },
+  "drawer": {
+   "width": "288px",
+   "z": 30,
+   "scrimZ": 20,
+   "height": "calc(100% - 56px)",
+   "top": "56px"
+  },
+  "composer": {
+   "z": 10,
+   "maxWidth": "768px",
+   "position": "fixed bottom"
+  },
+  "toaster": {
+   "z": 100,
+   "anchor": "top-16 right-4 — directly beneath the profile avatar"
+  },
+  "dialog": {
+   "overlayZ": 70,
+   "contentZ": 80
+  },
+  "content": {
+   "chat": "768px",
+   "files": "896px",
+   "presentations": "1280px",
+   "login": "384px"
+  },
+  "gutter": "24px",
+  "breakpoints": {
+   "sm": "640px",
+   "md": "768px",
+   "lg": "1024px"
+  },
+  "alignment": "Flush left everywhere. Centred only where there is no content to align to yet: login, welcome, empty states, the quick-action row."
+ },
+ "motion": {
+  "duration": {
+   "fast": "100ms",
+   "base": "200ms",
+   "slow": "300ms"
+  },
+  "easing": {
+   "enter": "cubic-bezier(0.22, 1, 0.36, 1)",
+   "default": "ease-out"
+  },
+  "keyframes": {
+   "blink": {
+    "value": "0.85s step-end infinite",
+    "source": "--animate-blink",
+    "usage": "Streaming caret."
+   },
+   "pingPulse": {
+    "value": "1.2s cubic-bezier(0,0,0.2,1) infinite",
+    "source": "--animate-ping-pulse",
+    "usage": "Active step halo."
+   },
+   "stepIn": {
+    "value": "0.3s cubic-bezier(0.22,1,0.36,1) both",
+    "source": "--animate-step-in",
+    "usage": "Thinking-panel row entrance."
+   }
+  },
+  "routeTransition": "opacity + blur(4px) → 0 over 200ms",
+  "reducedMotion": "Suppressed globally by @media (prefers-reduced-motion: reduce) in globals.css and <MotionConfig reducedMotion=\"user\"> in app-shell.tsx. No animation may be the sole carrier of information."
+ },
+ "component": {
+  "button": {
+   "height": {
+    "xs": "24px",
+    "sm": "28px",
+    "default": "32px",
+    "lg": "36px"
+   },
+   "iconSize": {
+    "xs": "24px",
+    "sm": "28px",
+    "default": "32px",
+    "lg": "36px"
+   },
+   "radius": "radius.lg",
+   "type": "14px / 500",
+   "paddingX": "10px",
+   "iconGlyph": "16px (14px in dense rows)",
+   "variants": [
+    "default",
+    "outline",
+    "secondary",
+    "ghost",
+    "destructive",
+    "link"
+   ],
+   "states": [
+    "default",
+    "hover",
+    "focus-visible",
+    "active",
+    "disabled",
+    "loading"
+   ],
+   "rules": [
+    "One filled (default) button per view or dialog.",
+    "Active navigation is expressed as ghost → default, not an underline or rail.",
+    "Destructive actions are ghost-tinted-red until confirmed; the only solid red button is the ConfirmDialog confirm.",
+    "A disabled button must carry a reason.",
+    "focus-visible ring is never removed or replaced.",
+    "Fix the cva recipe rather than adding a per-call-site hover, focus or state colour."
+   ]
+  },
+  "input": {
+   "height": "32px",
+   "radius": "radius.lg",
+   "paddingX": "10px",
+   "fill": "transparent (light) / input/30 (dark)",
+   "type": "16px, 14px at md"
+  },
+  "textarea": {
+   "minHeight": "64px",
+   "sizing": "field-sizing-content",
+   "radius": "radius.lg"
+  },
+  "badge": {
+   "height": "20px",
+   "radius": "full",
+   "type": "12px / 500",
+   "paddingX": "8px (6px with icon)",
+   "rule": "Read-only status. Never interactive."
+  },
+  "avatar": {
+   "sizes": {
+    "sm": "24px",
+    "default": "32px",
+    "lg": "40px"
+   },
+   "shape": "circle",
+   "fallback": "initials from display name or email local-part"
+  },
+  "card": {
+   "radius": "radius.xl",
+   "padding": "16px per slot",
+   "slotGap": "16px",
+   "outline": "ring-1 ring-foreground/10",
+   "footer": "border-t + bg-muted/50, flush to the card edges"
+  },
+  "dialog": {
+   "radius": "radius.xl",
+   "padding": "16px",
+   "maxWidth": "sm–md",
+   "placement": {
+    "centred": "Confirmations — irreversible, meant to interrupt",
+    "anchored": "Settings and Profile — top-16 right-3, hanging from the avatar"
+   }
+  },
+  "dropdown": {
+   "minWidth": "192px",
+   "padding": "4px",
+   "itemRadius": "radius.md",
+   "highlight": "bg-muted",
+   "elevation": "shadow.md"
+  },
+  "tooltip": {
+   "ground": "text.primary inverted",
+   "radius": "radius.sm",
+   "type": "12px",
+   "delay": "300ms in the top bar"
+  },
+  "toast": {
+   "radius": "radius.xl",
+   "minWidth": "240px",
+   "maxWidth": "360px",
+   "elevation": "shadow.lg",
+   "lifetimeMax": "10s",
+   "anchor": "layout.toaster.anchor",
+   "aria": "role=status aria-live=polite"
+  },
+  "unused": {
+   "primitives": [
+    "ui/progress.tsx",
+    "ui/separator.tsx"
+   ],
+   "note": "Defined but not yet consumed — both are dependency-free and are the right thing to reach for rather than hand-rolling a divider or a bar. tabs/accordion/sheet/chart and the three dead product components were deleted in v1.1; recharts went with the chart primitive."
+  }
+ },
+ "accessibility": {
+  "claim": "The product has NOT been formally evaluated against a WCAG conformance level. The ratios below are measurements of the shipped palette.",
+  "contrast": {
+   "text.primary on background (light)": "19.90:1",
+   "text.primary on background (dark)": "15.94:1",
+   "action.primaryText on action.primary (light)": "6.33:1",
+   "action.primaryText on action.primary (dark)": "4.73:1",
+   "text.secondary on background (light)": "5.39:1",
+   "text.secondary on surface.default (light)": "5.06:1",
+   "text.secondary on surface.sunken (light)": "4.62:1",
+   "text.secondary on background (dark)": "5.96:1",
+   "text.secondary on surface.default (dark)": "5.73:1",
+   "accent.ink on background (light)": "5.70:1",
+   "accent.ink on background (dark)": "6.77:1",
+   "status.error on background (light)": "5.25:1",
+   "status.error on surface.default (light)": "4.93:1",
+   "status.error on background (dark)": "6.66:1",
+   "status.onError on status.error (light)": "5.25:1",
+   "status.onError on status.error (dark)": "6.66:1",
+   "status.success on background (light) [icon only]": "3.77:1",
+   "status.advisory on background (light) [icon only]": "3.19:1"
+  },
+  "rules": [
+   "Every text pair in the palette clears 4.5:1 in both themes. status.success and status.advisory are the two exceptions and are icon-only.",
+   "text.secondary on surface.default (5.06:1) is the contrast floor — never lighten it, and never put it on surface.sunken.",
+   "Colour is never the only signal for a state.",
+   "Hover-revealed actions must also respond to focus-within.",
+   "Every icon-only control carries an aria-label; tooltips supplement names, they never replace them."
+  ],
+  "knownGaps": [
+   "Touch targets are 24-32px, below the 44x44 guidance.",
+   "Disabled controls explain themselves via the native title attribute, which is unreliable for assistive technology.",
+   "The sign-in mode switch has tablist/tab/aria-selected but no tabpanel, aria-controls or arrow-key navigation.",
+   "Streaming assistant replies are not announced in a live region.",
+   "There is no skip link past the fixed top bar."
+  ]
+ },
+ "resolved": {
+  "1 - three reds": "RESOLVED in v1.1. rose-* and red-* are gone from the app; every danger surface uses --destructive / --destructive-foreground. The only remaining rose value is one stop of the decorative deck-cover gradient.",
+  "2 - eleven dead tokens": "RESOLVED in v1.1. All eight --sidebar-* tokens, --input-background and --switch-background deleted from both themes, along with the --color-sidebar-* mappings in @theme inline.",
+  "3 - dead components": "RESOLVED in v1.1. presentation-download-button.tsx, ai-processing-state.tsx and pipeline-status.tsx deleted. PresentationPreview is the deck surface; AIThinkingPanel is the progress surface.",
+  "4 - unused primitives": "RESOLVED in v1.1. ui/tabs.tsx, ui/accordion.tsx, ui/sheet.tsx and ui/chart.tsx deleted; recharts removed from package.json. Removing it also exposed `immer` as an undeclared direct dependency of the zustand store — now declared.",
+  "5 - primary button had no hover": "RESOLVED in v1.1. The default variant's hover is no longer scoped to [a]; the two per-call-site overrides that existed to work around it were removed.",
+  "6 - dashboard gradients": "SCOPED EXCEPTION, documented at the definition in dashboard.tsx and in CLAUDE.md. Decorative cover for a generated artefact only; the hue carries no meaning and must not spread to chrome, status, data or type.",
+  "7 - two heading systems": "OPEN. The base layer styles bare h1/h2/h3 but every page headline sets `display text-3xl` explicitly. The base layer is the safety net; always set the role explicitly in components.",
+  "8 - duplicated password field": "OPEN. PasswordInput is defined twice, in login-screen.tsx and profile-dialog.tsx, differing only by a bg-muted/30. Should be one component in components/ui/ with the panel fill as a prop."
+ }
+}

@@ -138,13 +138,13 @@ function buildQuickActions(periods: UserPeriod[], fileCount: number): QuickActio
     actions.push({
       icon:  BarChart3,
       label: `Compare ${previous.quarter} ${previous.year} vs ${latest.quarter} ${latest.year}`,
-      color: 'text-rose-600 dark:text-rose-400',
+      color: 'text-amber-600 dark:text-amber-400',
     });
   } else {
     actions.push({
       icon:  TrendingUp,
       label: `Analyse ${latest.quarter} ${latest.year}`,
-      color: 'text-rose-600 dark:text-rose-400',
+      color: 'text-amber-600 dark:text-amber-400',
     });
   }
 
@@ -402,14 +402,14 @@ export function ChatInterface() {
                     message.role === 'user'
                       ? 'rounded-tl-xl rounded-tr-xl rounded-br-xs rounded-bl-xl bg-[#23233d]/90 text-white dark:bg-[#fafafa] dark:text-black'
                       : message.isError
-                      ? 'rounded-tl-xl rounded-tr-xl rounded-br-xl rounded-bl-xs border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/30'
+                      ? 'rounded-tl-xl rounded-tr-xl rounded-br-xl rounded-bl-xs border border-destructive/30 bg-destructive/5'
                       : 'rounded-tl-xl rounded-tr-xl rounded-br-xl rounded-bl-xs bg-muted/50 border border-border'
                   }`}>
 
                     {message.isError ? (
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="size-4 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
-                        <p className="text-sm text-rose-700 dark:text-rose-300 leading-relaxed">
+                        <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
+                        <p className="text-sm text-destructive leading-relaxed">
                           {message.content}
                         </p>
                       </div>
@@ -636,7 +636,7 @@ export function ChatInterface() {
               className={`shrink-0 rounded-full transition-all duration-200 ${
                 !input.trim() || isProcessing
                   ? 'opacity-50 cursor-not-allowed'
-                  : 'bg-primary hover:bg-violet-600 shadow-md'
+                  : 'shadow-md'
               }`}
             >
               <Send className="size-4" />

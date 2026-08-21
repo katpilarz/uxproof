@@ -58,7 +58,7 @@ export function ConfirmDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-start gap-3">
-            <div className="size-9 shrink-0 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 grid place-items-center">
+            <div className="size-9 shrink-0 rounded-lg bg-destructive/10 text-destructive grid place-items-center">
               <AlertTriangle className="size-4.5" />
             </div>
             <div className="min-w-0 space-y-1.5">
@@ -83,7 +83,7 @@ export function ConfirmDialog({
           <Button
             onClick={handleConfirm}
             disabled={pending}
-            className="bg-red-600 text-white hover:bg-red-600/90 focus-visible:ring-red-600/30"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/30"
           >
             {pending && <Loader2 className="size-4 animate-spin" />}
             {pending ? 'Deleting…' : confirmLabel}
