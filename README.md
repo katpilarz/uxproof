@@ -58,15 +58,26 @@ never leaves the machine.
 
 ## The deck
 
-Fixed 8-slide template: Cover → Headline SUS score → Trend chart → 8 UX
-indicators → Top issues → Recommendations → Summary → Thank you.
+The Dossier template: a **library of slide types, not a fixed run**. Cover,
+contents, executive summary, study at a glance, section dividers, one slide
+per finding, findings summary, task performance, SUS by participant, trend,
+key indicators, recommendations, appendix. A slide is emitted only when the
+data behind it exists, so a report of seven metrics yields a short honest
+deck and a full study yields a long one — nothing is ever padded.
 
-Strictly monochrome — black / white / gray, Space Grotesk + DM Sans +
-DM Mono, hairline rules, no logos. The single source of truth is
-[next/src/lib/branding/brand.ts](next/src/lib/branding/brand.ts); layout
-never passes through the model, so the deck cannot drift. (One deliberate
-exception: the cover photograph stays in full colour.) The **app UI** keeps
-its own violet identity — the monochrome rule applies to decks only.
+Ground `#F3F2F2`, ink `#201E1D`, a single violet accent `#6D4AF5`, Schibsted
+Grotesk with IBM Plex Mono for uppercase chrome, corner radius 0 everywhere,
+at most one violet figure per slide. Photographs are greyscale — the app
+converts an uploaded one in the browser before it is stored. The single
+source of truth is
+[next/src/lib/branding/brand.ts](next/src/lib/branding/brand.ts); which
+slides exist is decided in
+[next/src/lib/ppt/deck-data.ts](next/src/lib/ppt/deck-data.ts). Neither
+layout nor structure passes through the model, so the deck cannot drift.
+
+The uxproof mark appears on the cover and section dividers, drawn as shapes
+so it stays vector. The **app UI** keeps its own violet accent, separate
+from the deck's.
 
 ## Running locally
 

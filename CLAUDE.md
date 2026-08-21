@@ -49,9 +49,16 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
   generated DECKS follow the Dossier build spec: ground `#F3F2F2` (never pure
   white), ink `#201E1D`, violet accent `#6D4AF5` with deep/pale variants and four
   flat ink tints; Schibsted Grotesk (ExtraBold / SemiBold / Regular) for everything
-  and IBM Plex Mono for uppercase chrome only. NO logos or company branding
-  anywhere in app or decks. Never hardcode a colour, face, size or margin outside
-  `brand.ts`.
+  and IBM Plex Mono for uppercase chrome only. Never hardcode a colour, face,
+  size or margin outside `brand.ts`.
+  - **The uxproof mark** is the one piece of branding, and it appears in three
+    places that must stay in step: `UxproofMark` (`components/top-bar.tsx`),
+    the favicon (`app/icon.svg`), and the deck's cover and section dividers
+    (`drawLogo` in `lib/ppt-generator.ts`). The canonical artwork is
+    `next/public/brand/uxproof-logo.svg`. On the deck it is drawn with SHAPES,
+    never an image, so it stays vector — and only the glyph is drawn, in the
+    ground colour, because it always sits on a violet field there. No other
+    logos or client branding anywhere.
   - The slide is defined at **13.333 × 7.5 in** (a custom pptxgenjs layout), which
     is the size the spec is drawn for, so every position in the spec is used
     verbatim. Don't reintroduce a rescaling step.
@@ -65,11 +72,37 @@ render. The agent service runs on port 8001 (`AGENT_SERVICE_URL`); Ollama is loc
     the deck reflows.
 - **The app UI has its own violet, distinct from the deck's.** The web app's
   identity is `--primary: #5B47D6` (light) / `#7060e0` (dark) plus the
-  violet-tinted neutrals in `next/src/app/globals.css`, the violet logomark
-  gradient in `top-bar.tsx` / `app/icon.svg`, and violet/emerald/rose status
-  accents across chrome components. The deck's violet is `#6D4AF5` and lives in
-  `brand.ts`. They are separate systems — don't unify them, and don't let deck
-  tokens leak into the app or vice versa.
+  violet-tinted neutrals in `next/src/app/globals.css`. The mark's own violet is
+  the flat `#7E27FE` in `LOGO_VIOLET` (`top-bar.tsx`), which the "ux" of the
+  wordmark also takes. The deck's violet is `#6D4AF5` and
+  lives in `brand.ts`. They are separate systems — don't unify them, and don't
+  let deck tokens leak into the app or vice versa. The only sanctioned crossing
+  is the slide-thumbnail strip in `presentation-preview.tsx`, which paints deck
+  ground `#F3F2F2` and deck violet `#6D4AF5` because it is *depicting* the deck.
+  - **One danger colour, and it is a token.** `--destructive` is the danger INK
+    (and the solid fill); `--destructive-foreground` is what sits ON that fill;
+    washes are `destructive/5`–`/20`. It is deliberately inverted between themes
+    — `#d4183d` on light, `#f87171` on dark — because dark mode needs the danger
+    colour to read as ink against `#13131f`. Never introduce a raw Tailwind
+    `red-*` or `rose-*` utility; there used to be three reds and now there is
+    one.
+  - **Status hues are icon-only in light mode.** `emerald-600` (3.77:1) and
+    `amber-600` (3.19:1) clear the 3:1 graphics threshold but fail it for text.
+    They may colour a dot, a check glyph or a ≤16px icon and nothing else — if a
+    label needs to read as successful, use `foreground` and let the icon carry
+    the hue. Always write them as a `light dark:` pair.
+  - **`muted-foreground` is the contrast floor** at 5.06:1 on `card`, which is
+    where most of it lands. Never lighten it, and never put muted text on
+    `muted`.
+  - **The one exception to "violet is the only chroma"** is the hashed
+    multi-hue gradient on deck cover tiles in `dashboard.tsx` — decorative
+    identity for a generated artefact, where the hue carries no meaning. It must
+    not spread to chrome, status, data or type.
+  - **Every colour decision goes through a token.** Don't add a per-call-site
+    hover, focus or state colour to work around a gap in a `cva` recipe — fix
+    the recipe in `components/ui/` so the whole app inherits it.
+  - The full system, with measured contrast for every pair, is
+    `context/design-system/design-system.pdf` and `design-tokens.json`.
 - **Lightweight per-user auth, password-protected.** Accounts are email +
   password: `/api/auth/*` + `next/src/lib/auth.ts` hash the password with
   scrypt (`node:crypto` — no bcrypt/argon dependency, no external service) and

@@ -79,7 +79,7 @@ These come from `CLAUDE.md` and are the highest-priority test targets. A build t
 
 ### Deterministic deliverable
 * The generated .pptx always has exactly 8 slides in the fixed order.
-* Deck styling is monochrome (black/white/gray) with the colour cover photo as the only exception — no accent colours, no logos.
+* Deck styling follows the Dossier spec: ground #F3F2F2, ink, a single violet accent #6D4AF5, Schibsted Grotesk + IBM Plex Mono, corner radius 0, at most one violet figure per slide, greyscale photographs. The uxproof mark appears on the cover and section dividers only, drawn as shapes. Deck LENGTH varies — a slide exists only when its data does, and the deck is never padded to a fixed count.
 
 ---
 
