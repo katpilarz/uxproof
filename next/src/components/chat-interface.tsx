@@ -547,14 +547,18 @@ export function ChatInterface() {
   const showQuickActions = isNewSession && messages.length === 0 && !restoring;
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="relative flex flex-col h-full w-full">
       <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-6 py-6 mb-26">
         <AnimatePresence mode="wait">
           {renderMessages()}
         </AnimatePresence>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-10 bg-background px-6 py-4 w-full">
+      {/* Pinned to the chat COLUMN, not the viewport: the history sidebar is
+          non-modal and pushes the content aside, and a viewport-fixed
+          composer would stay centred on the screen while the messages above
+          it moved. */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 bg-background px-6 py-4 w-full">
         <AnimatePresence>
           {showQuickActions && (
             <motion.div

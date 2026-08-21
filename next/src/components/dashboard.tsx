@@ -156,21 +156,24 @@ export function Dashboard({ onChatClick }: DashboardProps) {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {stats.map((stat) => (
             <Card
               key={stat.label}
-              className="p-5 border border-border bg-white dark:bg-card shadow-sm shadow-violet-100/50 dark:shadow-none"
+              className="p-4 sm:p-5 border border-border bg-white dark:bg-card shadow-sm shadow-violet-100/50 dark:shadow-none"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                  <p className="text-3xl font-semibold">
+              {/* min-w-0 on the label block and shrink-0 on the badge: the
+                  label wraps inside its own column instead of running under
+                  the icon when the tile narrows. */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">{stat.label}</p>
+                  <p className="text-2xl sm:text-3xl font-semibold">
                     {loading ? '—' : stat.value}
                   </p>
                 </div>
-                <div className="size-10 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                  <stat.icon className="size-5" />
+                <div className="size-9 sm:size-10 shrink-0 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                  <stat.icon className="size-4 sm:size-5" />
                 </div>
               </div>
             </Card>
@@ -232,8 +235,8 @@ export function Dashboard({ onChatClick }: DashboardProps) {
                 </div>
 
                 <div className="px-5 pt-5 pb-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
+                  <div className="flex items-start justify-between mb-3 gap-2">
+                    <div className="flex-1 min-w-0">
                       <h3 className="font-medium mb-1 line-clamp-2">
                         {presentation.title || 'UX Research Report'}
                       </h3>
@@ -241,7 +244,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
                     </div>
                     <Badge
                       variant={presentation.status === 'completed' ? 'default' : 'secondary'}
-                      className="ml-2"
+                      className="shrink-0"
                     >
                       {presentation.status ?? 'completed'}
                     </Badge>
