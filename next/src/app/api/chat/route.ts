@@ -131,7 +131,7 @@ async function conversationalize(
     // Guardrail: every substantial number in the reply must appear in the
     // facts OR the conversation history (earlier grounded answers are a
     // legitimate source for follow-ups). Small integers (list markers,
-    // "8-slide"), years, and the SUS scale maximum (…"/ 100") are allowed.
+    // slide counts), years, and the SUS scale maximum (…"/ 100") are allowed.
     const allowedDigits = (facts + '\n' + history.map(h => h.content).join('\n')).replace(/,/g, '');
     for (const num of reply.replace(/,/g, '').match(/\d+(?:\.\d+)?/g) ?? []) {
       const value = parseFloat(num);
@@ -210,7 +210,7 @@ function casualReply(message: string): string {
     return `Hello! I'm the **uxproof research assistant**.\n\nI can help you with:\n\n• **See what you have** — _"Summarize my files"_\n• **Analyse a period** — _"Analyse my latest quarter"_ or name one, _"Analyse Q3 2026"_\n• **Compare periods** — _"Compare Q3 2026 vs Q4 2026"_\n• **Full year overviews** — _"Full year 2026 overview"_\n• **Generate presentations** — _"Generate a presentation"_ for your latest period\n\nWhat would you like to explore?`;
   }
   if (/how (can|do) you help/.test(q) || /what can you do/.test(q) || /^help\b/.test(q)) {
-    return `I'm the **uxproof research assistant** — I turn **your uploaded** UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Summarize research files you upload with the **+** button (CSV, JSON, TXT, Markdown, PDF)\n• Query SUS, task success, NPS, error-rate and conversion data from your uploaded quarters\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate 8-slide .pptx research decks\n\n**Try:**\n\n• _"Summarize my files"_\n• _"Analyse my latest quarter"_\n• _"Generate a presentation"_`;
+    return `I'm the **uxproof research assistant** — I turn **your uploaded** UX research data into client-ready insights and presentations.\n\n**I can:**\n\n• Summarize research files you upload with the **+** button (CSV, JSON, TXT, Markdown, PDF)\n• Query SUS, task success, NPS, error-rate and conversion data from your uploaded quarters\n• Compare two periods side by side\n• Run AI-powered deep analysis via the agent pipeline\n• Generate client-ready .pptx research decks\n\n**Try:**\n\n• _"Summarize my files"_\n• _"Analyse my latest quarter"_\n• _"Generate a presentation"_`;
   }
   if (/who are you/.test(q)) return `I'm the **uxproof research assistant**. Try: _"Summarize my files"_ or _"Generate a presentation"_`;
   if (/^how are you/.test(q)) return `Ready to help with your UX research reporting! Try: _"Analyse my latest quarter"_`;
@@ -310,29 +310,32 @@ async function resolvePeriod(
 /**
  * Is this asking for a deck of some size other than the one we make?
  *
- * The deliverable is a fixed 8-slide template (Cover → SUS headline →
- * trend → indicators → issues → recommendations → summary → thank-you).
- * "just one slide" is a reasonable thing to ask and a real answer exists —
- * but the word "presentation" makes classifyMessage() route it into the
- * data path, where it comes back as a confusing "no research data for that
- * period" instead of "the deck is a fixed eight slides". Answer it directly.
+ * The deck is a library of slide types, not a running order: a slide is
+ * emitted only when the figures behind it exist, so the length follows the
+ * data and no slide count can be promised in advance. "just one slide" is a
+ * reasonable thing to ask and a real answer exists — but the word
+ * "presentation" makes classifyMessage() route it into the data path, where
+ * it comes back as a confusing "no research data for that period" instead of
+ * "the deck comes out whole". Answer it directly.
  */
 function asksForDifferentSlideCount(message: string): boolean {
   const q = message.toLowerCase();
   if (!/\b(slide|slides|deck|presentation|pptx|powerpoint)\b/.test(q)) return false;
-  if (/\b8\s*[-\s]?slides?\b|\beight\s+slides?\b/.test(q)) return false;   // that's what we make
   return /\b(one|single|1)\s+slide\b/.test(q)
       || /\bjust\s+(a|one)\s+slide\b/.test(q)
       || /\b\d+\s*[-\s]?slides?\b/.test(q);
 }
 
 const FIXED_DECK_ANSWER =
-  `The deck is a **fixed 8-slide template**, so I can't produce a partial one — ` +
-  `every deck comes out with the same structure:\n\n` +
-  `1. Cover  2. SUS headline  3. Trend chart  4. UX indicators\n` +
-  `5. Top issues  6. Recommendations  7. Summary  8. Thank-you\n\n` +
-  `That consistency is the point — the decks go to clients, so they're all ` +
-  `laid out the same way.\n\n` +
+  `I build the deck whole, so I can't produce a partial one — it comes out ` +
+  `in the same order every time:\n\n` +
+  `**Overview** — cover, contents, executive summary, the numbers at a glance\n` +
+  `**Findings** — one slide per issue observed, then a summary poster\n` +
+  `**Measures** — task performance, trends, SUS by participant, indicators\n` +
+  `**Response** — the recommendations from this round, then an appendix\n\n` +
+  `The length follows your data: a section appears only when the research ` +
+  `behind it exists, and nothing is padded to reach a slide count. That ` +
+  `consistency is the point — the decks go to clients.\n\n` +
   `What I can do is generate the full deck and let you keep the one slide you ` +
   `need: **_"Generate a presentation"_**. Once it's downloaded, delete ` +
   `the slides you don't want in PowerPoint or Keynote.`;

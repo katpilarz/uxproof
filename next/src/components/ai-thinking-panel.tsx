@@ -20,7 +20,7 @@ const STEP_SEQUENCES: Record<string, { id: string; label: string }[]> = {
   presentation: [
     { id: 'context',    label: 'Retrieving data from Sanity CMS…'     },
     { id: 'extraction', label: 'Extracting research intelligence…'    },
-    { id: 'planning',   label: 'Planning 8-slide narrative structure…' },
+    { id: 'planning',   label: 'Planning the narrative structure…' },
     { id: 'generating', label: 'Applying template layout…'     },
   ],
   analysis: [

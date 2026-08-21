@@ -319,7 +319,7 @@ export function PresentationPreview({
             size="sm"
             onClick={handleDownload}
             disabled={genState === 'downloading'}
-            className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs"
+            className="gap-1.5 text-xs"
           >
             {genState === 'downloading'
               ? <Loader2 className="size-3.5 animate-spin" />
@@ -345,7 +345,7 @@ export function PresentationPreview({
           </div>
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-sm text-foreground truncate">{period}</h4>
-            <p className="text-xs text-muted-foreground">Building 8-slide research deck…</p>
+            <p className="text-xs text-muted-foreground">Building your research deck…</p>
           </div>
           <span className="text-xs text-muted-foreground font-mono tabular-nums shrink-0">
             {elapsed}s
@@ -399,7 +399,7 @@ export function PresentationPreview({
         <Button
           size="sm"
           onClick={handleGenerate}
-          className="w-full gap-2 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+          className="w-full gap-2 text-xs"
         >
           <Download className="size-3.5" />
           Generate &amp; download .pptx
