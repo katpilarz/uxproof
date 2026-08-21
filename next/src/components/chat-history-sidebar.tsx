@@ -351,7 +351,7 @@ export function ChatHistorySidebar() {
                               }}
                               aria-label={`Delete conversation “${title}”`}
                               title="Delete conversation"
-                              className="size-6 grid place-items-center rounded-md text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                              className="size-6 grid place-items-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
                             >
                               <Trash2 className="size-3.5" />
                             </button>

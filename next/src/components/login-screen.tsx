@@ -23,7 +23,7 @@ import { Camera, Eye, EyeOff, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input }  from '@/components/ui/input';
 import { Label }  from '@/components/ui/label';
-import { UxproofMark } from '@/components/top-bar';
+import { UxproofMark, LOGO_VIOLET } from '@/components/top-bar';
 import { useLogin, useRegister, useLoginPending } from '@/store';
 import { cn } from '@/lib/utils';
 
@@ -172,7 +172,7 @@ export function LoginScreen() {
         <div className="flex flex-col items-center mb-6">
           <UxproofMark className="size-12 mb-4" />
           <h1 className="text-xl font-semibold tracking-tight lowercase">
-            <span className="text-violet-600 dark:text-violet-400">ux</span>proof
+            <span style={{ color: LOGO_VIOLET }}>ux</span>proof
           </h1>
           <p className="text-sm text-muted-foreground mt-1.5 text-center">
             {isSignup

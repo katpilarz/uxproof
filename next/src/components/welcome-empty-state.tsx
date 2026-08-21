@@ -1,6 +1,5 @@
 'use client';
 
-import { BarChart3, FileText } from 'lucide-react';
 
 function WelcomeIllustration() {
   return (
@@ -196,23 +195,6 @@ function WelcomeIllustration() {
  
 
 export function WelcomeEmptyState() {
-  const features = [
-    {
-      icon: BarChart3,
-      title: 'Analyze KPIs',
-      description: 'SUS, task success, NPS & more',
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bg: 'bg-emerald-500/10',
-    },
-    {
-      icon: FileText,
-      title: 'Research Insights',
-      description: 'Natural language Q&A',
-      color: 'text-amber-600 dark:text-amber-400',
-      bg: 'bg-amber-500/10',
-    },
-  ];
-
   return (
     <div className="flex-1 flex items-start justify-center p-8">
       <div className="max-w-2xl text-center">

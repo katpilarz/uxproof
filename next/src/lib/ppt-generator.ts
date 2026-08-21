@@ -156,6 +156,49 @@ function m4(pptx: Deck, o: { eyebrow: string; number: number }) {
   return s;
 }
 
+
+// ─── Logomark ─────────────────────────────────────────────────────────────────
+//
+// The uxproof mark, drawn with shapes rather than an embedded image so it
+// stays vector in the .pptx and scales without softening. Geometry is the
+// brand SVG's, expressed in its own 56-unit box and scaled at draw time —
+// keep it in step with UxproofMark (components/top-bar.tsx) and the
+// favicon (app/icon.svg).
+//
+// Only the glyph is drawn, never the violet tile: on the deck it always
+// sits on a violet field, where the template's rule is that marks take the
+// ground colour. A #7E27FE tile on a #6D4AF5 plate would just be muddy.
+
+/**
+ * Draw the mark's glyph at (x, y), `size` inches square.
+ *
+ * Coordinates are the brand SVG's 56-unit tile after its
+ * translate(3.3,3.3) scale(1.9) — the glyph centred at ~61% of the tile.
+ * Stroke widths are derived from `size` rather than fixed, so the mark is
+ * proportionally identical at the cover's 0.4in and a divider's 0.26in.
+ */
+function drawLogo(s: Slide, pptx: Deck, x: number, y: number, size: number, color: string) {
+  const u  = size / 56;                          // tile units → inches
+  const at = (v: number) => v * u;
+  const pt = (units: number) => units * u * 72;  // tile units → points
+
+  // Three document lines.
+  for (const [bx, by, bw] of [[10.9, 12.04, 33.63], [10.9, 23.44, 10.64], [10.9, 34.84, 10.64]]) {
+    block(s, pptx, { x: x + at(bx), y: y + at(by), w: at(bw), h: at(3.99), color });
+  }
+
+  // The magnifier: a ring and its handle.
+  const r = 9.31;
+  s.addShape(pptx.shapes.OVAL, {
+    x: x + at(33.7 - r), y: y + at(30.85 - r), w: at(r * 2), h: at(r * 2),
+    fill: { type: 'none' }, line: { color, width: pt(3.8) },
+  });
+  s.addShape(pptx.shapes.LINE, {
+    x: x + at(40.29), y: y + at(37.44), w: at(45.1 - 40.29), h: at(43.96 - 37.44),
+    line: { color, width: pt(4.18), endArrowType: 'none' },
+  });
+}
+
 // ─── Cover (M2) ───────────────────────────────────────────────────────────────
 
 function renderCover(pptx: Deck, slide: Extract<DeckSlide, { kind: 'cover' }>, photo: string) {
@@ -175,6 +218,9 @@ function renderCover(pptx: Deck, slide: Extract<DeckSlide, { kind: 'cover' }>, p
   const padX = G.marginX + 0.5;    // 0.5 in side padding
   const innerW = plateW - 1.0;
   let y = plateY + 0.44;           // 0.44 in top padding
+
+  drawLogo(s, pptx, padX, y, 0.4, C.onVioletHeading);
+  y += 0.56;
 
   chrome(s, { text: `${slide.title} · ${slide.period}`, x: padX, y, w: innerW, color: C.onVioletLabel });
   y += 0.42;
@@ -207,7 +253,7 @@ function renderCover(pptx: Deck, slide: Extract<DeckSlide, { kind: 'cover' }>, p
   slide.meta.forEach((m, i) => {
     const x = padX + i * colW;
     chrome(s, { text: m.label, x, y, w: colW - 0.1, color: C.onVioletLabel });
-    s.addText(m.value, {
+    s.addText(tidyValue(m.value), {
       x, y: y + 0.24, w: colW - 0.1, h: 0.3,
       fontFace: F.displaySemi, fontSize: 13, color: C.onVioletHeading, margin: 0, valign: 'top',
     });
@@ -233,7 +279,8 @@ function renderDivider(pptx: Deck, slide: Extract<DeckSlide, { kind: 'divider' }
     sizing: { type: 'cover', w: panelW, h: H },
   });
 
-  chrome(s, { text: `Section ${slide.numeral}`, x: G.marginX, y: G.eyebrowY - 0.1, w: 5, color: C.onVioletHeading });
+  drawLogo(s, pptx, G.marginX, G.eyebrowY - 0.13, 0.26, C.onVioletHeading);
+  chrome(s, { text: `Section ${slide.numeral}`, x: G.marginX + 0.38, y: G.eyebrowY - 0.1, w: 5, color: C.onVioletHeading });
 
   s.addText(slide.numeral, {
     x: G.marginX, y: 2.05, w: 5, h: 1.8,
@@ -516,16 +563,19 @@ function renderTaskPerformance(
       fontFace: F.displaySemi, fontSize: 14, color: C.ink, align: 'center', margin: 0, valign: 'top',
     });
     if (t.name) {
-      s.addText(clamp(t.name, 26), {
-        x, y: baseY + 0.4, w: barW, h: 0.26,
-        fontFace: F.display, fontSize: 13, color: C.ink55, align: 'center', margin: 0, valign: 'top',
+      // Two lines of room: a real task name ("Correct a wrong decision")
+      // is wider than one bar at this column count.
+      s.addText(clamp(t.name, 34), {
+        x, y: baseY + 0.4, w: barW, h: 0.5,
+        fontFace: F.display, fontSize: 13, lineSpacing: 16,
+        color: C.ink55, align: 'center', margin: 0, valign: 'top',
       });
     }
     const meta = [t.medianTime, t.errors !== undefined ? `${t.errors} errors` : '']
       .filter(Boolean).join(' · ');
     if (meta) {
       s.addText(meta, {
-        x, y: baseY + 0.66, w: barW, h: 0.26,
+        x, y: baseY + 0.92, w: barW, h: 0.26,
         fontFace: F.display, fontSize: 13, color: C.ink55, align: 'center', margin: 0, valign: 'top',
       });
     }

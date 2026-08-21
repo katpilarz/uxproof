@@ -246,7 +246,7 @@ export function FilesView() {
                     onClick={() => setPendingDelete(file)}
                     aria-label={`Delete ${file.filename}`}
                     title="Delete file"
-                    className="shrink-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                    className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="size-4" />
                   </Button>

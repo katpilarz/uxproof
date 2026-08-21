@@ -31,29 +31,36 @@ function PanelLeftRounded({ className }: { className?: string }) {
   );
 }
 
-// uxproof logomark — app-icon tile: violet gradient, a checkmark whose
-// tail rises past the tile's optical centre (evidence validated ✓) with
-// a spark dot where the insight "lands". Mirrored as the favicon in
-// app/icon.svg — keep the two in sync. Exported for the login screen.
+// uxproof logomark — the brand mark: a flat violet tile carrying a
+// document under a magnifier (research, examined). Mirrored exactly as the
+// favicon in app/icon.svg and on the deck cover — keep the three in sync.
+//
+// Only the TILE lives here. Both call sites set the "uxproof" wordmark as
+// HTML text beside it, so it inherits the app's own type and stays
+// selectable; LOGO_VIOLET is the one colour that must match the tile.
+export const LOGO_VIOLET = '#7E27FE';
+
 export function UxproofMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
-      <defs>
-        <linearGradient id="uxg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#8B75FF" />
-          <stop offset="1" stopColor="#5B47D6" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="9" fill="url(#uxg)" />
-      <path
-        d="M8.5 17.5l5 5L23 11.5"
-        fill="none" stroke="white" strokeWidth="3.2"
-        strokeLinecap="round" strokeLinejoin="round"
-      />
-      <circle cx="24.2" cy="7.6" r="1.9" fill="white" opacity="0.9" />
+    <svg viewBox="0 0 56 56" className={className} aria-hidden="true">
+      <rect width="56" height="56" rx="12" fill={LOGO_VIOLET} />
+      {/* The glyph, centred and filling ~61% of the tile. translate/scale
+          are derived from its own extent (x 4–22, y 4.6–21.4) so it stays
+          optically centred if the scale is ever changed again. */}
+      <g transform="translate(3.3,3.3) scale(1.9)">
+        <rect x="4" y="4.6"  width="17.7" height="2.1" rx="1.05" fill="#FFFFFF" />
+        <rect x="4" y="10.6" width="5.6"  height="2.1" rx="1.05" fill="#FFFFFF" />
+        <rect x="4" y="16.6" width="5.6"  height="2.1" rx="1.05" fill="#FFFFFF" />
+        <circle cx="16" cy="14.5" r="4.9" stroke="#FFFFFF" strokeWidth="2" fill="none" />
+        <line
+          x1="19.47" y1="17.97" x2="22" y2="21.4"
+          stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"
+        />
+      </g>
     </svg>
   );
 }
+
 import {
   Tooltip,
   TooltipContent,
@@ -120,7 +127,7 @@ export function TopBar({
               >
                 <UxproofMark className="size-6" />
                 <span className="text-[17px] font-semibold tracking-tight lowercase leading-none">
-                  <span className="text-violet-600 dark:text-violet-400">ux</span>
+                  <span style={{ color: LOGO_VIOLET }}>ux</span>
                   <span className="text-foreground">proof</span>
                 </span>
               </Button>
