@@ -40,3 +40,4 @@ Thumbs.db
 
 # ── Claude Code (local agent config, not shipped) ────────────────────
 .claude/
+CLAUDE.md
