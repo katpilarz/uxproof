@@ -37,3 +37,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.pem
+
+# ── Claude Code (local agent config, not shipped) ────────────────────
+.claude/
