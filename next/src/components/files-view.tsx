@@ -26,7 +26,6 @@ import { motion } from 'framer-motion';
 import {
   FileText,
   Plus,
-  Loader2,
   Sparkles,
   ChevronDown,
   Layers,
@@ -36,6 +35,8 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import { MarkdownMessage } from '@/components/markdown-message';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useNewSession, useSetPendingPrompt, useShowToast } from '@/store';
@@ -155,26 +156,25 @@ export function FilesView() {
           </Button>
         </div>
 
-        {loading && (
-          <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            <span className="text-sm">Loading your files…</span>
-          </div>
-        )}
+        {loading && <LoadingState label="Loading your files…" />}
 
         {!loading && files.length === 0 && (
-          <div className="flex flex-col items-center gap-3 py-20 text-center">
-            <FileText className="size-10 text-muted-foreground/30" />
-            <p className="text-sm text-muted-foreground">No files yet.</p>
-            <p className="text-sm text-muted-foreground/70 max-w-sm">
-              Upload research reports from the chat with the <span className="font-semibold">+</span> button —
-              CSV, JSON, TXT, Markdown or PDF. The data is extracted automatically.
-            </p>
-            <Button variant="outline" size="sm" onClick={goToChat} className="gap-2 mt-2">
-              <Plus className="size-3.5" />
-              Go to chat
-            </Button>
-          </div>
+          <EmptyState
+            icon={FileText}
+            title="No files yet."
+            description={
+              <>
+                Upload research reports from the chat with the <span className="font-semibold">+</span> button —
+                CSV, JSON, TXT, Markdown or PDF. The data is extracted automatically.
+              </>
+            }
+            action={
+              <Button variant="outline" size="sm" onClick={goToChat} className="gap-2">
+                <Plus className="size-3.5" />
+                Go to chat
+              </Button>
+            }
+          />
         )}
 
         <div className="space-y-3">
@@ -184,7 +184,7 @@ export function FilesView() {
             const latest  = hasData ? file.reportsCreated![file.reportsCreated!.length - 1] : null;
 
             return (
-              <Card key={file._id} className="border border-border bg-card overflow-hidden p-0">
+              <Card key={file._id} className="gap-0 p-0 ring-0 border border-border bg-card overflow-hidden">
                 {/* One row from md up; below that the identity block takes the
                     full width and the controls drop onto their own line, so
                     the filename and its metadata never collide with a button. */}

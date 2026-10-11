@@ -8,10 +8,11 @@
  * "Settings", and "Log out"; logging out clears the session cookie,
  * resets per-user state, and confirms via toast (handled in the auth
  * slice). Every confirmation toast is anchored directly beneath this
- * avatar — see components/toaster.tsx.
+ * avatar — see components/toaster.tsx. Below sm the top bar drops its
+ * theme toggle, and this menu carries it instead.
  */
 
-import { LogOut, Settings, UserRound } from 'lucide-react';
+import { LogOut, Moon, Settings, Sun, UserRound } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -21,6 +22,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { useAuthUser, useLogout, useOpenSettings, useOpenProfile } from '@/store';
+import { useTheme } from './theme-provider';
 
 function initialsFor(email: string, name?: string): string {
   const source = (name || email.split('@')[0] || '?').trim();
@@ -36,6 +38,7 @@ export function UserMenu() {
   const logout       = useLogout();
   const openSettings = useOpenSettings();
   const openProfile  = useOpenProfile();
+  const { theme, setTheme } = useTheme();
 
   if (!user) return null;
 
@@ -45,7 +48,7 @@ export function UserMenu() {
         <button
           type="button"
           aria-label="Account menu"
-          className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring transition-opacity hover:opacity-85"
+          className="relative tap-target rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring transition-opacity hover:opacity-85"
         >
           <Avatar>
             {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name || user.email} />}
@@ -79,6 +82,13 @@ export function UserMenu() {
         <DropdownMenuItem onSelect={() => openSettings()}>
           <Settings />
           Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          className="sm:hidden"
+        >
+          {theme === 'light' ? <Moon /> : <Sun />}
+          {theme === 'light' ? 'Dark mode' : 'Light mode'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout()}>

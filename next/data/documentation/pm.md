@@ -1,5 +1,7 @@
 # uxproof — Product Brief
 
+> **Note, 11 October 2026.** The original brief from August 2026. The deck has since become the Dossier template, a library of slide types whose length follows the data. See the root README for the current product.
+
 **Owner:** Katarzyna Pilarz · PAISAK4U (paisak4u.com)
 **Status:** internal tool, demo dataset
 

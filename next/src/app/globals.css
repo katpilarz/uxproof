@@ -9,6 +9,10 @@
 --font-sans: var(--font-schibsted), "Schibsted Grotesk", "Helvetica Neue", sans-serif;
 --font-mono: var(--font-plex-mono), "IBM Plex Mono", monospace;
 --font-heading: var(--font-schibsted), "Schibsted Grotesk", "Helvetica Neue", sans-serif;
+  /* Breakpoints: Tailwind's sm/md/lg plus xs at 360px, the narrowest
+     common phone, below which the top bar sheds its logo button. */
+  --breakpoint-xs: 22.5rem;
+
   /* Container */
   --container-center: true;
   --container-padding: 2rem;
@@ -79,7 +83,11 @@
   --destructive: #d4183d;
   --destructive-foreground: #ffffff;
   --border: rgba(91, 71, 214, 0.1);
-  --input: transparent;
+  /* The form-field EDGE. It was transparent, so fields had no visible
+     boundary at all; a field edge needs 3:1 against what it sits on.
+     #8A7FD9 scores 3.43 on background and 3.22 on card. Fields take their
+     fill from --muted, not from this token. */
+  --input: #8A7FD9;
   --ring: #5B47D6;
   --radius: 0.625rem;
 }
@@ -106,7 +114,9 @@
   --destructive: #f87171;
   --destructive-foreground: #13131f;
   --border: rgba(120, 100, 220, 0.13);
-  --input: #21213a;
+  /* The old #21213a edge scored 1.18:1. #66668A clears 3:1 on background
+     (3.36), card (3.23) and the muted/30 field fill (3.12). */
+  --input: #66668A;
   --ring: #7060e0;
 }
 
@@ -141,6 +151,21 @@
 
 @utility animate-step-in {
   animation: var(--animate-step-in);
+}
+
+/* Touch targets: on a coarse pointer, grow a control's HIT AREA to at
+   least 44×44 without changing how it looks. The ::after is laid out
+   against the control, so the control must be positioned (relative or
+   absolute). Keep the gap between two tap-targets at least as wide as
+   the growth, (44px − size) / 2, or one steals taps from the other. */
+@utility tap-target {
+  @media (pointer: coarse) {
+    &::after {
+      content: "";
+      position: absolute;
+      inset: min(0px, calc((100% - 44px) / 2));
+    }
+  }
 }
 
 /* Display headline role — Schibsted Grotesk with the paisak4u.com tight

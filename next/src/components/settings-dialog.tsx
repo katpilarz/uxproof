@@ -91,7 +91,7 @@ function DeckPhotoSection() {
           type="button"
           onClick={() => inputRef.current?.click()}
           aria-label={url ? 'Change deck photograph' : 'Upload deck photograph'}
-          className="relative w-28 h-16 shrink-0 overflow-hidden border border-border bg-muted/40 grid place-items-center hover:border-violet-400 transition-colors"
+          className="relative w-28 h-16 shrink-0 overflow-hidden border border-border bg-muted/50 grid place-items-center hover:border-violet-400 transition-colors"
         >
           {url ? (
             // Remote Sanity URL and local previews alike — plain <img> is

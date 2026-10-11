@@ -11,7 +11,8 @@ for the full setup.
 - `executiveIntelligence` — extracted intelligence written back by the
   agent pipeline (summary, KPI summaries, metric signals, issue
   highlights, strategic signals).
-- `slidePlan` — the planned 8-slide deck the ppt-generator renders.
+- `slidePlan` — the planning agent's content for a deck; the Next.js
+  app decides which slide types it renders from it.
 - `presentation` — metadata for generated .pptx files.
 - `chatSession` / `chatMessage` — persisted chat history.
 

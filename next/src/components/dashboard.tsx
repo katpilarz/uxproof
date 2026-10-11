@@ -23,12 +23,12 @@ import {
   Calendar,
   BarChart,
   Layers,
-  Loader2,
   Trash2,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
+import { LoadingState } from './ui/loading-state';
 import PowerPointIcon from './ui/powerpoint-icon';
 import { ConfirmDialog } from './confirm-dialog';
 import { useShowToast } from '@/store';
@@ -160,7 +160,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
           {stats.map((stat) => (
             <Card
               key={stat.label}
-              className="p-4 sm:p-5 border border-border bg-white dark:bg-card shadow-sm shadow-violet-100/50 dark:shadow-none"
+              className="p-4 sm:p-5"
             >
               {/* min-w-0 on the label block and shrink-0 on the badge: the
                   label wraps inside its own column instead of running under
@@ -180,12 +180,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
           ))}
         </div>
 
-        {loading && (
-          <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            <span className="text-sm">Loading your presentations…</span>
-          </div>
-        )}
+        {loading && <LoadingState label="Loading your presentations…" />}
 
         {/* Presentations Grid */}
         {!loading && (
@@ -193,7 +188,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
             {presentations.map((presentation) => (
               <Card
                 key={presentation._id}
-                className="group hover:shadow-lg transition-all duration-200 overflow-hidden border border-border bg-card"
+                className="group gap-0 py-0 ring-0 hover:shadow-lg transition-all duration-200 overflow-hidden border border-border bg-card"
               >
                 <div
                   className={`h-40 bg-gradient-to-br ${gradientFor(presentation._id)} relative flex items-center justify-center`}
@@ -270,7 +265,7 @@ export function Dashboard({ onChatClick }: DashboardProps) {
 
             {/* Add New — high-contrast card */}
             <Card
-              className="overflow-hidden border-0 cursor-pointer group transition-all duration-200 hover:scale-[1.01] bg-[#0f0f1c] dark:bg-white"
+              className="gap-0 py-0 ring-0 overflow-hidden border-0 cursor-pointer group transition-all duration-200 hover:scale-[1.01] bg-[#0f0f1c] dark:bg-white"
               onClick={() => onChatClick?.()}
             >
               <div className="h-full flex flex-col items-center justify-center text-center min-h-[280px] relative overflow-hidden">

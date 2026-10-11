@@ -58,7 +58,7 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="bg-muted/70">{children}</thead>
+            <thead className="bg-muted">{children}</thead>
           ),
           th: ({ children }) => (
             <th className="px-3 py-2 text-left font-semibold text-foreground border-b border-border whitespace-nowrap">
@@ -119,7 +119,7 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
               return (
                 <span
                   title={title}
-                  className="inline-flex items-center align-baseline ml-1 px-1.5 py-px rounded
+                  className="inline-flex items-center align-baseline ml-1 px-1.5 py-px rounded-sm
                              bg-violet-500/10 text-violet-700 dark:text-violet-300
                              text-[11px] font-mono leading-tight whitespace-nowrap"
                 >
@@ -131,13 +131,13 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
             const isBlock = codeClass?.includes('language-');
             if (isBlock) {
               return (
-                <code className="block bg-muted/60 rounded-md p-3 text-xs font-mono overflow-x-auto my-2 whitespace-pre">
+                <code className="block bg-muted/50 rounded-md p-3 text-xs font-mono overflow-x-auto my-2 whitespace-pre">
                   {children}
                 </code>
               );
             }
             return (
-              <code className="bg-muted/60 rounded px-1.5 py-0.5 text-xs font-mono text-foreground break-words">
+              <code className="bg-muted/50 rounded-sm px-1.5 py-0.5 text-xs font-mono text-foreground break-words">
                 {children}
               </code>
             );
@@ -158,7 +158,7 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
             <li className="flex gap-3 text-sm text-foreground leading-relaxed">
               <span
                 aria-hidden="true"
-                className="text-muted-foreground/70 shrink-0 select-none mt-[0.15rem] leading-none"
+                className="text-muted-foreground shrink-0 select-none mt-[0.15rem] leading-none"
               >
                 •
               </span>
@@ -166,7 +166,7 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
             </li>
           ),
           // ── HR ─────────────────────────────────────────────────────────────
-          hr: () => <hr className="my-4 border-border/40" />,
+          hr: () => <hr className="my-4 border-border/50" />,
 
           // ── Blockquote ─────────────────────────────────────────────────────
           blockquote: ({ children }) => (

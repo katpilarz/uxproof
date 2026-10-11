@@ -25,9 +25,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { X, MessageSquare, Plus, Loader2, Trash2, Pencil, Check } from 'lucide-react';
+import { X, MessageSquare, Plus, Trash2, Pencil, Check } from 'lucide-react';
 import { Button }     from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { EmptyState }   from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import { cn }         from '@/lib/utils';
 import { formatDistanceToNowStrict, isToday, isYesterday, differenceInCalendarDays } from 'date-fns';
 
@@ -172,7 +174,7 @@ export function ChatHistorySidebar() {
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between pl-4 pr-2 h-12 border-b border-border/60 shrink-0">
+      <div className="flex items-center justify-between pl-4 pr-2 h-12 border-b border-border/50 shrink-0">
         <span className="font-medium text-sm text-foreground">Chats</span>
         <Button
           variant="ghost" size="icon" className="size-7"
@@ -199,26 +201,20 @@ export function ChatHistorySidebar() {
       {/* Session list */}
       <ScrollArea className="flex-1 min-h-0 w-full">
         <div className="px-2 pb-4 w-full min-w-0">
-          {loading && !hasSessions && (
-            <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              <span className="text-xs">Loading sessions…</span>
-            </div>
-          )}
+          {loading && !hasSessions && <LoadingState size="sm" label="Loading sessions…" />}
 
           {!loading && !hasSessions && (
-            <div className="flex flex-col items-center gap-2 py-12 px-4 text-center">
-              <MessageSquare className="size-8 text-muted-foreground/30" />
-              <p className="text-xs text-muted-foreground">No previous chats yet</p>
-              <p className="text-xs text-muted-foreground/60">
-                Conversations appear here once you send a message.
-              </p>
-            </div>
+            <EmptyState
+              size="sm"
+              icon={MessageSquare}
+              title="No previous chats yet"
+              description="Conversations appear here once you send a message."
+            />
           )}
 
           {grouped.map(({ label, items }) => (
             <div key={label} className="mt-2">
-              <p className="px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60">
+              <p className="px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
                 {label}
               </p>
               <div className="space-y-0.5">
@@ -246,10 +242,10 @@ export function ChatHistorySidebar() {
                         disabled={isRenaming}
                         className={cn(
                           'w-full max-w-full text-left pl-2.5 py-2 rounded-lg border transition-colors duration-150 overflow-hidden',
-                          isRenaming ? 'pr-9' : 'pr-14',
+                          isRenaming ? 'pr-9' : 'pr-14 pointer-coarse:pr-16',
                           isActive
                             ? 'bg-violet-500/10 border-violet-500/40'
-                            : 'bg-transparent border-transparent hover:bg-muted/60',
+                            : 'bg-transparent border-transparent hover:bg-muted dark:hover:bg-muted/50',
                         )}
                       >
                         {/* Primary line: the conversation's name */}
@@ -273,7 +269,7 @@ export function ChatHistorySidebar() {
                             maxLength={120}
                             aria-label="Conversation name"
                             placeholder="Name this conversation"
-                            className="w-full bg-transparent text-xs leading-snug text-foreground outline-none border-b border-violet-500/60 pb-0.5"
+                            className="w-full bg-transparent text-xs leading-snug text-foreground outline-none border-b border-ring pb-0.5"
                           />
                         ) : (
                           <p
@@ -288,7 +284,7 @@ export function ChatHistorySidebar() {
                           </p>
                         )}
                         {/* Metadata line: quarter tag + relative time */}
-                        <p className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground/60 truncate">
+                        <p className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground truncate">
                           {s.quarter && (
                             <span className="font-mono uppercase tracking-wide">{s.quarter}</span>
                           )}
@@ -299,7 +295,10 @@ export function ChatHistorySidebar() {
 
                       {/* Row actions. While renaming, the only action is
                           "save" — mousedown (not click) so it fires before
-                          the input's blur tears the field down. */}
+                          the input's blur tears the field down. A touch
+                          screen has no hover to reveal them, so on a coarse
+                          pointer they are always shown, spaced wide enough
+                          that their 44px tap-targets don't overlap. */}
                       {isRenaming ? (
                         <button
                           onMouseDown={(e) => {
@@ -308,12 +307,12 @@ export function ChatHistorySidebar() {
                           }}
                           aria-label="Save conversation name"
                           title="Save name (Enter)"
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                          className="tap-target absolute right-1.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors"
                         >
                           <Check className="size-3.5" />
                         </button>
                       ) : (
-                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pointer-coarse:gap-2.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity">
                           {/* Rename — edits in place, saved via PATCH */}
                           <button
                             onClick={(e) => {
@@ -322,7 +321,7 @@ export function ChatHistorySidebar() {
                             }}
                             aria-label={`Rename conversation “${title}”`}
                             title="Rename conversation"
-                            className="size-6 grid place-items-center rounded-md text-muted-foreground/50 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                            className="relative tap-target size-6 grid place-items-center rounded-md text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
                           >
                             <Pencil className="size-3.5" />
                           </button>
@@ -336,7 +335,7 @@ export function ChatHistorySidebar() {
                             }}
                             aria-label={`Delete conversation “${title}”`}
                             title="Delete conversation"
-                            className="size-6 grid place-items-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            className="relative tap-target size-6 grid place-items-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           >
                             <Trash2 className="size-3.5" />
                           </button>

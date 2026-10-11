@@ -299,15 +299,15 @@ export function PresentationPreview({
         className={`rounded-xl border border-border bg-card p-4 space-y-3 ${className}`}
       >
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Layers className="size-5 text-primary" />
+          <div className="size-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+            <Layers className="size-5 text-violet-600 dark:text-violet-400" />
           </div>
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-sm truncate text-foreground">{period}</h4>
             <p className="text-xs text-muted-foreground">{count} slides · Dossier template</p>
           </div>
           <Badge variant="secondary" className="gap-1 shrink-0">
-            <Check className="size-3 text-emerald-500" />
+            <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
             Ready
           </Badge>
         </div>
@@ -340,8 +340,8 @@ export function PresentationPreview({
     return (
       <div className={`rounded-xl border border-border bg-card overflow-hidden ${className}`}>
         <div className="flex items-center gap-3 p-4 pb-3">
-          <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Layers className="size-5 text-primary" />
+          <div className="size-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+            <Layers className="size-5 text-violet-600 dark:text-violet-400" />
           </div>
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-sm text-foreground truncate">{period}</h4>
@@ -382,8 +382,8 @@ export function PresentationPreview({
       className={`rounded-xl border border-border bg-card p-4 space-y-3 ${className}`}
     >
       <div className="flex items-center gap-3">
-        <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <Layers className="size-5 text-primary" />
+        <div className="size-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+          <Layers className="size-5 text-violet-600 dark:text-violet-400" />
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm truncate text-foreground">{period}</h4>

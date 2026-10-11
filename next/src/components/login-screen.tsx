@@ -19,10 +19,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, Eye, EyeOff, Loader2, X } from 'lucide-react';
+import { Camera, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input }  from '@/components/ui/input';
 import { Label }  from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { UxproofMark, LOGO_VIOLET } from '@/components/top-bar';
 import { useLogin, useRegister, useLoginPending } from '@/store';
 import { cn } from '@/lib/utils';
@@ -31,56 +32,6 @@ const MAX_AVATAR_BYTES  = 4 * 1024 * 1024; // keep in sync with lib/avatar.ts
 const MIN_PASSWORD_CHARS = 8;              // keep in sync with lib/auth.ts
 
 type Mode = 'signin' | 'signup';
-
-/** Password field with a show/hide toggle — typing a password you can't
- *  see is the most common source of a failed sign-in. */
-function PasswordInput({
-  id,
-  label,
-  value,
-  onChange,
-  autoComplete,
-  placeholder,
-  autoFocus,
-}: {
-  id:            string;
-  label:         string;
-  value:         string;
-  onChange:      (v: string) => void;
-  autoComplete:  string;
-  placeholder?:  string;
-  autoFocus?:    boolean;
-}) {
-  const [visible, setVisible] = useState(false);
-
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input
-          id={id}
-          type={visible ? 'text' : 'password'}
-          required
-          autoFocus={autoFocus}
-          autoComplete={autoComplete}
-          placeholder={placeholder}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="pr-10"
-        />
-        <button
-          type="button"
-          onClick={() => setVisible(v => !v)}
-          aria-label={visible ? 'Hide password' : 'Show password'}
-          title={visible ? 'Hide password' : 'Show password'}
-          className="absolute right-2 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {visible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export function LoginScreen() {
   const login    = useLogin();
@@ -185,7 +136,7 @@ export function LoginScreen() {
         <div
           role="tablist"
           aria-label="Sign in or create an account"
-          className="grid grid-cols-2 gap-1 p-1 mb-4 rounded-xl bg-muted/60"
+          className="grid grid-cols-2 gap-1 p-1 mb-4 rounded-xl bg-muted/50"
         >
           {(['signin', 'signup'] as const).map(m => (
             <button
@@ -195,7 +146,7 @@ export function LoginScreen() {
               aria-selected={mode === m}
               onClick={() => switchMode(m)}
               className={cn(
-                'h-8 rounded-lg text-sm font-medium transition-colors',
+                'relative tap-target h-8 rounded-lg text-sm font-medium transition-colors',
                 mode === m
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground',
@@ -209,12 +160,12 @@ export function LoginScreen() {
         <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm">
           {/* Avatar + display name — signup only */}
           {isSignup && (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-2 pointer-coarse:gap-3.5">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 aria-label={avatar ? 'Change avatar image' : 'Upload avatar image'}
-                className="relative size-20 rounded-full border border-dashed border-border bg-muted/40 overflow-hidden grid place-items-center hover:border-violet-400 transition-colors group"
+                className="relative size-20 rounded-full border border-dashed border-border bg-muted/50 overflow-hidden grid place-items-center hover:border-violet-400 transition-colors group"
               >
                 {avatarUrl ? (
                   // Local preview of the picked file — plain <img> is intentional
@@ -229,7 +180,7 @@ export function LoginScreen() {
                 <button
                   type="button"
                   onClick={() => handleFile(null)}
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  className="relative tap-target inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="size-3" />
                   Remove photo
@@ -275,23 +226,29 @@ export function LoginScreen() {
             </div>
           )}
 
-          <PasswordInput
-            id="login-password"
-            label="Password"
-            value={password}
-            onChange={v => { setPassword(v); setError(''); }}
-            autoComplete={isSignup ? 'new-password' : 'current-password'}
-            placeholder={isSignup ? `At least ${MIN_PASSWORD_CHARS} characters` : undefined}
-          />
+          <div className="space-y-1.5">
+            <Label htmlFor="login-password">Password</Label>
+            <PasswordInput
+              id="login-password"
+              required
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
+              placeholder={isSignup ? `At least ${MIN_PASSWORD_CHARS} characters` : undefined}
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(''); }}
+            />
+          </div>
 
           {isSignup && (
-            <PasswordInput
-              id="login-confirm"
-              label="Confirm password"
-              value={confirm}
-              onChange={v => { setConfirm(v); setError(''); }}
-              autoComplete="new-password"
-            />
+            <div className="space-y-1.5">
+              <Label htmlFor="login-confirm">Confirm password</Label>
+              <PasswordInput
+                id="login-confirm"
+                required
+                autoComplete="new-password"
+                value={confirm}
+                onChange={e => { setConfirm(e.target.value); setError(''); }}
+              />
+            </div>
           )}
 
           {error && (
@@ -306,7 +263,7 @@ export function LoginScreen() {
           </Button>
         </form>
 
-        <p className="text-xs text-muted-foreground/70 text-center mt-4">
+        <p className="text-xs text-muted-foreground text-center mt-4">
           Your research data stays on this machine — your account only
           separates each person&apos;s chats and decks.
         </p>

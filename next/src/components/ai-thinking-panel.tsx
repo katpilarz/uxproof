@@ -39,6 +39,12 @@ const STEP_SEQUENCES: Record<string, { id: string; label: string }[]> = {
   ],
 };
 
+const STEP_STATE_LABEL: Record<Step['state'], string> = {
+  done:    'Done',
+  active:  'In progress',
+  pending: 'Pending',
+};
+
 // Stable default — an inline `{}` default would be a fresh object every
 // render, which re-runs the timer effect below on each parent re-render
 // and stalls the simulated step ladder.
@@ -96,16 +102,17 @@ export function AIThinkingPanel({
     <div className={`px-4 py-3 ${className} w-full`}>
       {/* Header — violet accent, matching your UI */}
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-sm font-semibold text-black dark:text-white">
+        <span className="text-sm font-semibold text-foreground">
           Processing request
         </span>
       </div>
 
-      {/* Steps */}
-      <div className="space-y-2.5">
+      {/* Steps — an ordered list, and each step's state is spoken as well
+          as drawn (dot, weight, strike-through), so it never rests on colour. */}
+      <ol className="space-y-2.5" aria-label="Processing steps">
         <AnimatePresence>
           {visibleSteps.map((step) => (
-            <motion.div
+            <motion.li
               key={step.id}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
@@ -119,20 +126,21 @@ export function AIThinkingPanel({
                   ? 'text-muted-foreground line-through decoration-muted-foreground/40'
                   : step.state === 'active'
                   ? 'text-foreground font-medium'
-                  : 'text-muted-foreground/50'
+                  : 'text-muted-foreground'
               }`}>
+                <span className="sr-only">{STEP_STATE_LABEL[step.state]}: </span>
                 {step.label}
               </span>
 
               {step.state === 'done' && streamSteps[step.id]?.duration_ms && (
-                <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono tabular-nums shrink-0">
+                <span className="ml-auto text-[10px] text-muted-foreground font-mono tabular-nums shrink-0">
                   {((streamSteps[step.id].duration_ms ?? 0) / 1000).toFixed(1)}s
                 </span>
               )}
-            </motion.div>
+            </motion.li>
           ))}
         </AnimatePresence>
-      </div>
+      </ol>
     </div>
   );
 }
@@ -148,7 +156,7 @@ function StepDot({ state }: { state: Step['state'] }) {
         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
         className="size-4 rounded-full bg-emerald-500/15 dark:bg-emerald-500/20 flex items-center justify-center shrink-0"
       >
-        <svg className="size-2.5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 12 12" fill="none">
+        <svg className="size-2.5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 12 12" fill="none" aria-hidden="true">
           <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </motion.div>
@@ -165,9 +173,11 @@ function StepDot({ state }: { state: Step['state'] }) {
     );
   }
 
+  // Pending: with the label no longer faded, the ring is what sets a
+  // pending step apart from a done one at a glance, so it needs 3:1.
   return (
     <div className="size-4 shrink-0 flex items-center justify-center">
-      <span className="size-2 rounded-full border border-border bg-transparent" />
+      <span className="size-2 rounded-full border border-muted-foreground bg-transparent" />
     </div>
   );
 }

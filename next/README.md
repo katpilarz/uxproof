@@ -15,10 +15,12 @@ Sanity project, and optionally the FastAPI agent service from
 
 ## Key modules
 
-- `src/lib/branding/brand.ts` — PAISAK4U brand system (colors, fonts,
-  slide themes). Single source of truth for deck styling.
-- `src/lib/ppt-generator.ts` — renders the fixed 8-slide deck with
-  pptxgenjs from a Sanity slidePlan.
+- `src/lib/branding/brand.ts` — the Dossier deck template (colours,
+  fonts, sizes). Single source of truth for deck styling.
+- `src/lib/ppt/deck-data.ts` — decides which slide types the deck
+  contains, purely from the data behind them.
+- `src/lib/ppt-generator.ts` — renders the deck with pptxgenjs from a
+  Sanity slidePlan.
 - `src/lib/ppt-assets.ts` — embedded wordmark variants + default cover
   photo as data URIs.
 - `src/lib/agents/unified-agent.ts` — routes chat queries: precise

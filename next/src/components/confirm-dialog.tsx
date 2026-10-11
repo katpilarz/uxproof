@@ -83,7 +83,7 @@ export function ConfirmDialog({
           <Button
             onClick={handleConfirm}
             disabled={pending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/30"
+            variant="destructive-solid"
           >
             {pending && <Loader2 className="size-4 animate-spin" />}
             {pending ? 'Deleting…' : confirmLabel}

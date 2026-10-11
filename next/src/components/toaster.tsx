@@ -31,7 +31,7 @@ const VARIANT_ICON = {
 } as const;
 
 const VARIANT_ICON_CLASS = {
-  success: 'text-emerald-500',
+  success: 'text-emerald-600 dark:text-emerald-400',
   error:   'text-destructive',
   info:    'text-violet-500',
 } as const;
@@ -55,7 +55,7 @@ function CountdownRing({
       onClick={onClick}
       aria-label="Dismiss notification"
       title="Dismiss"
-      className="relative shrink-0 size-6 grid place-items-center rounded-full hover:bg-muted transition-colors"
+      className="relative tap-target shrink-0 size-6 grid place-items-center rounded-full hover:bg-muted transition-colors"
     >
       <svg viewBox="0 0 20 20" className="absolute inset-0.5 -rotate-90" aria-hidden="true">
         <circle

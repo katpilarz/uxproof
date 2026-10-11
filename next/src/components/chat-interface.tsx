@@ -33,6 +33,8 @@ import { Send, Sparkles, FileText, TrendingUp, BarChart3, AlertCircle, Plus, Cor
 import { Button }              from '@/components/ui/button';
 import { Badge }               from '@/components/ui/badge';
 import { Textarea }            from '@/components/ui/textarea';
+import { EmptyState }          from '@/components/ui/empty-state';
+import { LoadingState }        from '@/components/ui/loading-state';
 import type { Message }        from '@/types';
 import { PresentationPreview } from './presentation-preview';
 import { WelcomeEmptyState }   from './welcome-empty-state';
@@ -129,7 +131,7 @@ function buildQuickActions(periods: UserPeriod[], fileCount: number): QuickActio
   actions.push({
     icon:  Sparkles,
     label: `Generate ${latest.quarter} ${latest.year} presentation`,
-    color: 'text-emerald-600 dark:text-emerald-400',
+    color: 'text-violet-600 dark:text-violet-400',
   });
 
   if (previous) {
@@ -241,6 +243,32 @@ export function ChatInterface() {
   const [input,       setInput]       = useState('');
   const [lastQuery,   setLastQuery]   = useState('');
   const [streamedIds, setStreamedIds] = useState<Set<string>>(new Set());
+
+  // Screen-reader announcements. The message list is not a live region —
+  // the typewriter would have it re-read on every tick — so one polite
+  // region speaks the two moments that matter: work starting, and the
+  // finished reply. `since` (when the awaited work began; 0 = nothing
+  // awaited) keeps restored history silent: only a reply the user just
+  // asked for is spoken, and only once.
+  const [live, setLive] = useState({ text: '', since: 0 });
+  const announceWork = useCallback(() => {
+    setLive({ text: 'Working on your request…', since: Date.now() });
+  }, []);
+  const announceReply = useCallback((content: string) => {
+    setLive(prev => prev.since
+      ? { text: content.replace(/[*_`#>|]/g, '').trim(), since: 0 }
+      : prev);
+  }, []);
+  // An error reply never streams, so there is no onComplete to announce it;
+  // it is read straight off the newest message instead.
+  const lastMessage = messages[messages.length - 1];
+  const liveText =
+    live.since > 0 &&
+    lastMessage?.role === 'assistant' &&
+    lastMessage.isError &&
+    new Date(lastMessage.timestamp).getTime() >= live.since
+      ? lastMessage.content
+      : live.text;
   const [userData, setUserData] = useState<{ periods: UserPeriod[]; fileCount: number }>({
     periods: [], fileCount: 0,
   });
@@ -267,7 +295,10 @@ export function ChatInterface() {
   const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-uploading the same file
-    if (file && !isProcessing) uploadFile(file);
+    if (file && !isProcessing) {
+      announceWork();
+      uploadFile(file);
+    }
   };
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -291,8 +322,9 @@ export function ChatInterface() {
     if (!content || isProcessing) return;
     setInput('');
     setLastQuery(content);
+    announceWork();
     await sendMessage(content, activeSessionId);
-  }, [input, isProcessing, activeSessionId, sendMessage]);
+  }, [input, isProcessing, activeSessionId, sendMessage, announceWork]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -347,10 +379,8 @@ export function ChatInterface() {
   const renderMessages = () => {
     if (restoring) {
       return (
-        <motion.div key="restoring" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="flex items-center justify-center h-full gap-2 text-muted-foreground">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
-          <span className="text-sm">Loading session…</span>
+        <motion.div key="restoring" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full">
+          <LoadingState label="Loading session…" className="h-full py-0" />
         </motion.div>
       );
     }
@@ -418,9 +448,10 @@ export function ChatInterface() {
                         <StreamingMessage
                           content={message.content}
                           isStreaming={true}
-                          onComplete={() =>
-                            setStreamedIds(prev => new Set([...prev, message.id]))
-                          }
+                          onComplete={() => {
+                            setStreamedIds(prev => new Set([...prev, message.id]));
+                            announceReply(message.content);
+                          }}
                         />
                       ) : (
                         <MarkdownMessage content={message.content || '…'} />
@@ -513,7 +544,7 @@ export function ChatInterface() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleSend(text)}
-                            className="gap-1.5 text-xs shadow-sm hover:border-violet-400 dark:hover:border-violet-500"
+                            className="gap-1.5 text-xs"
                           >
                             <CornerDownRight className="size-3.5 text-violet-600 dark:text-violet-400" />
                             {text}
@@ -537,9 +568,8 @@ export function ChatInterface() {
     }
 
     return (
-      <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        className="flex items-center justify-center h-full text-muted-foreground">
-        <p className="text-sm">No messages found for this session.</p>
+      <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full">
+        <EmptyState title="No messages found for this session." className="h-full justify-center py-0" />
       </motion.div>
     );
   };
@@ -548,6 +578,7 @@ export function ChatInterface() {
 
   return (
     <div className="relative flex flex-col h-full w-full">
+      <div role="status" className="sr-only">{liveText}</div>
       <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-6 py-6 mb-26">
         <AnimatePresence mode="wait">
           {renderMessages()}
@@ -575,7 +606,7 @@ export function ChatInterface() {
                 >
                   <Button
                     variant="outline" size="sm"
-                    className="gap-2 hover:bg-muted/60 dark:hover:bg-muted hover:border-border transition-all duration-150"
+                    className="gap-2"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Plus className="size-3.5 text-violet-600 dark:text-violet-400" />
@@ -590,7 +621,7 @@ export function ChatInterface() {
                   >
                     <Button
                       variant="outline" size="sm"
-                      className="gap-2 hover:bg-muted/60 dark:hover:bg-muted hover:border-border transition-all duration-150"
+                      className="gap-2"
                       onClick={() => handleSend(action.label)}
                     >
                       <action.icon className={`size-3.5 ${action.color}`} />
@@ -606,7 +637,7 @@ export function ChatInterface() {
         <div className="max-w-3xl mx-auto mb-4">
           {/* Pill input: fully rounded container, + for file upload on the
               left, circular send button on the right. */}
-          <div className="relative flex items-center gap-2 p-2 pl-2.5 bg-muted/50 border border-border/50 rounded-full backdrop-blur focus-within:ring-2 focus-within:ring-violet-500/20 focus-within:border-violet-500 transition-all duration-300">
+          <div className="relative flex items-center gap-2 p-2 pl-2.5 bg-muted/50 border border-input rounded-full backdrop-blur focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 transition-all duration-300">
             <input
               ref={fileInputRef}
               type="file"

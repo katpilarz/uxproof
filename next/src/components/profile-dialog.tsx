@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Eye, EyeOff, KeyRound, Loader2, UserRound, X } from 'lucide-react';
+import { Camera, KeyRound, Loader2, UserRound, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ import {
 import { Button }     from '@/components/ui/button';
 import { Input }      from '@/components/ui/input';
 import { Label }      from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { AuthUser } from '@/store/slices/auth-slice';
 import {
@@ -56,38 +57,6 @@ function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: 
         {label}
       </span>
       <div className="flex-1 h-px bg-border" />
-    </div>
-  );
-}
-
-function PasswordField({
-  id, label, value, onChange, autoComplete,
-}: {
-  id: string; label: string; value: string;
-  onChange: (v: string) => void; autoComplete: string;
-}) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input
-          id={id}
-          type={visible ? 'text' : 'password'}
-          autoComplete={autoComplete}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="pr-10 bg-muted/30"
-        />
-        <button
-          type="button"
-          onClick={() => setVisible(v => !v)}
-          aria-label={visible ? 'Hide password' : 'Show password'}
-          className="absolute right-2 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {visible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-        </button>
-      </div>
     </div>
   );
 }
@@ -217,7 +186,7 @@ function ProfileForms({ user }: { user: AuthUser }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={shownAvatar} alt="" className="size-full object-cover" />
           ) : (
-            <span className="size-full grid place-items-center bg-muted/40">
+            <span className="size-full grid place-items-center bg-muted/50">
               <Camera className="size-5 text-muted-foreground group-hover:text-violet-500 transition-colors" />
             </span>
           )}
@@ -293,33 +262,42 @@ function ProfileForms({ user }: { user: AuthUser }) {
 
       <div className="space-y-4">
         {user.hasPassword ? (
-          <PasswordField
-            id="profile-current-password"
-            label="Current password"
-            value={currentPassword}
-            onChange={v => { setCurrentPassword(v); setPasswordError(''); }}
-            autoComplete="current-password"
-          />
+          <div className="space-y-1.5">
+            <Label htmlFor="profile-current-password">Current password</Label>
+            <PasswordInput
+              id="profile-current-password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={e => { setCurrentPassword(e.target.value); setPasswordError(''); }}
+              className="bg-muted/30"
+            />
+          </div>
         ) : (
           <p className="text-xs text-muted-foreground">
             This account doesn&apos;t have a password yet — set one now.
           </p>
         )}
 
-        <PasswordField
-          id="profile-new-password"
-          label="New password"
-          value={newPassword}
-          onChange={v => { setNewPassword(v); setPasswordError(''); }}
-          autoComplete="new-password"
-        />
-        <PasswordField
-          id="profile-confirm-password"
-          label="Confirm new password"
-          value={confirmPassword}
-          onChange={v => { setConfirmPassword(v); setPasswordError(''); }}
-          autoComplete="new-password"
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor="profile-new-password">New password</Label>
+          <PasswordInput
+            id="profile-new-password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={e => { setNewPassword(e.target.value); setPasswordError(''); }}
+            className="bg-muted/30"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="profile-confirm-password">Confirm new password</Label>
+          <PasswordInput
+            id="profile-confirm-password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={e => { setConfirmPassword(e.target.value); setPasswordError(''); }}
+            className="bg-muted/30"
+          />
+        </div>
 
         <p className="text-xs text-muted-foreground">
           At least {MIN_PASSWORD_CHARS} characters. You stay signed in on this device

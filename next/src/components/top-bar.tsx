@@ -10,6 +10,13 @@
  *   - "Presentations" → onDashboardClick → navigates to /presentations
  *
  * Settings moved into the chat input (chat-interface.tsx).
+ *
+ * Below sm the bar would collide at phone widths, so it sheds what it can
+ * without losing a destination: the wordmark goes screen-reader-only (the
+ * mark stays), the dividers drop, the nav takes xs metrics, and the theme
+ * toggle moves into the account menu (user-menu.tsx). Below xs (360px) the
+ * logo button goes too — "Chat" does the same thing. The three nav labels
+ * always stay text.
  */
 
 import { usePathname } from 'next/navigation';
@@ -70,6 +77,11 @@ import {
 import { useTheme } from './theme-provider';
 import { UserMenu } from './user-menu';
 
+// Below sm the nav takes the xs button metrics (24px tall, 12px type) so
+// all three labels fit beside the avatar at phone widths; tap-target still
+// gives each a 44px hit area on touch.
+const NAV_COMPACT = 'max-sm:h-6 max-sm:px-2 max-sm:text-xs';
+
 type TopBarProps = {
   onDashboardClick: () => void;   // → /presentations
   onFilesClick:     () => void;   // → /files
@@ -96,10 +108,10 @@ export function TopBar({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-border bg-background flex items-center justify-between px-4">
+      <div className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-border bg-background flex items-center justify-between gap-2 px-3 sm:px-4">
 
         {/* ── Left: sidebar toggle + app name ── */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -123,10 +135,10 @@ export function TopBar({
               <Button
                 variant="ghost"
                 onClick={onLogoClick}
-                className="flex items-center gap-2 px-2 hover:opacity-80 transition-opacity"
+                className="flex items-center gap-2 px-2 max-sm:px-1 max-xs:hidden hover:opacity-80 transition-opacity"
               >
                 <UxproofMark className="size-6" />
-                <span className="text-[17px] font-semibold tracking-tight lowercase leading-none">
+                <span className="text-[17px] font-semibold tracking-tight lowercase leading-none max-sm:sr-only">
                   <span style={{ color: LOGO_VIOLET }}>ux</span>
                   <span className="text-foreground">proof</span>
                 </span>
@@ -139,10 +151,11 @@ export function TopBar({
         </div>
 
         {/* ── Right ── */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <Button
             variant={isChat ? 'default' : 'ghost'}
             size="sm"
+            className={NAV_COMPACT}
             onClick={onNewChatClick}
           >
             Chat
@@ -151,6 +164,7 @@ export function TopBar({
           <Button
             variant={isFiles ? 'default' : 'ghost'}
             size="sm"
+            className={NAV_COMPACT}
             onClick={onFilesClick}
           >
             Files
@@ -159,12 +173,13 @@ export function TopBar({
           <Button
             variant={isPresentations ? 'default' : 'ghost'}
             size="sm"
+            className={NAV_COMPACT}
             onClick={onDashboardClick}
           >
             Presentations
           </Button>
 
-          <div className="h-6 w-px bg-border mx-1" />
+          <div className="h-6 w-px bg-border mx-1 max-sm:hidden" />
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -172,6 +187,8 @@ export function TopBar({
                 variant="ghost"
                 size="icon"
                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                className="max-sm:hidden"
               >
                 {theme === 'light'
                   ? <Moon className="size-4" />
@@ -183,7 +200,7 @@ export function TopBar({
             </TooltipContent>
           </Tooltip>
 
-          <div className="h-6 w-px bg-border mx-1" />
+          <div className="h-6 w-px bg-border mx-1 max-sm:hidden" />
 
           {/* Signed-in user — avatar opens the account dropdown (log out) */}
           <UserMenu />
