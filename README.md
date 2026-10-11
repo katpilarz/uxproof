@@ -31,11 +31,7 @@ its styling. Numbers the model extracts are checked against the source
 document, and model steps have rule-based fallbacks, so a slow or unreliable
 model doesn't stop the product working.
 
-![Division of authority](context/case-study/diagrams/uxproof-diagram-authority.svg)
-
 ## Architecture
-
-![System architecture](context/case-study/diagrams/uxproof-diagram-architecture.svg)
 
 | Part | Stack | Role |
 |---|---|---|
@@ -43,9 +39,6 @@ model doesn't stop the product working.
 | [agent-service/](agent-service/) | Python, FastAPI, Pydantic | Analysis pipeline in three steps: context, extraction and planning |
 | [sanity-studio/](sanity-studio/) | Sanity | Content store for users, reports, conversations and slide plans |
 | Ollama | Local language model | Model inference on the same machine |
-
-The app's design system is documented in
-[context/design-system/](context/design-system/).
 
 ## Getting started
 
